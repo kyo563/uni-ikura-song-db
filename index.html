@@ -60,7 +60,8 @@
 
   function buildGvizUrl() {
     // 列は A,B,C,D（アーティスト/曲名/備考/直リンク）を想定
-    const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
+    const tq = encodeURIComponent(
+  `select A,B,C,D where A is not null or B is not null offset 3 limit ${MAX_FETCH_ROWS}`
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
   }
 
