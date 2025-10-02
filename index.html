@@ -26,32 +26,233 @@
   /* ▶ アイコン（歌枠直リンク）の見た目とタップしやすさ */
   .link-icon {
     display:inline-flex; align-items:center; justify-content:center;
-    width:32px; height:32px; line-height:1; text-decoration:none; font-size:18px;
+    width:36px; height:36px; line-height:1; text-decoration:none; font-size:18px;
   }
   .link-icon:active { transform: translateY(1px); }
 
-  /* ===== スマホ：2行カード表示に切替 ===== */
+  /* ===== スマホ：2行カード表示 ===== */
   @media (max-width: 768px) {
-    /* テーブルは非表示、モバイル用リストを表示 */
     table { display:none; }
     .mobile-list { display:block; margin-top:8px; }
     .item {
       border-bottom:1px solid #eee; padding:10px 6px;
       display:flex; flex-direction:column; gap:6px;
     }
-    .l1 { /* 1行目：アーティスト / 曲名（太字推奨） */
-      font-size:15px; line-height:1.5; font-weight:600;
-      display:flex; gap:6px; flex-wrap:wrap;
+    .l1 { /* 1行目：アーティスト / 曲名（太字・広く） */
+      font-size:15px; line-height:1.5; font-weight:600; display:flex; gap:6px; flex-wrap:wrap;
     }
     .l1 .sep { opacity:.6; }
-    .l2 { /* 2行目：備考 + 右側にリンク/コピー */
-      display:flex; align-items:center; gap:8px;
+    .l2 { /* 2行目：右側にリンク/コピーのみ（備考は削除） */
+      display:flex; align-items:center; justify-content:flex-end; gap:8px;
     }
-    .note { flex:1; font-size:13px; color:#333; min-width:0; }
-    .note { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .ops { display:flex; align-items:center; gap:6px; }
     .btn { padding:6px 10px; font-size:13px; }
   }
 
-  /* ===== PC：従来テーブル（列幅最適化） ===== */
-  @med
+  /* ===== PC：従来テーブル（備考列なし・幅配分見直し） ===== */
+  @media (min-width: 769px) {
+    table { table-layout: fixed; }
+    /* 列配分：1=アーティスト 2=曲名 3=リンク 4=コピー */
+    th:nth-child(1), td:nth-child(1) { width: 30%; }
+    th:nth-child(2), td:nth-child(2) { width: 60%; } /* 曲名を広く */
+    th:nth-child(3), td:nth-child(3) {
+      width: 5%; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    td:nth-child(3) a { display:inline-block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    th:nth-child(4), td:nth-child(4) { width: 5%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="row">
+    <input id="q" type="search" placeholder="曲名／アーティスト名で検索（例：群青日和／椎名林檎）" autocomplete="off">
+  </div>
+  <div class="row">
+    <select id="limit" style="max-width:140px;">
+      <option value="50">上限 50件</option>
+      <option value="100">上限 100件</option>
+    </select>
+    <div class="pill">
+      <label><input type="radio" name="mode" value="contains" checked><span>部分一致</span></label>
+      <label><input type="radio" name="mode" value="prefix"><span>前方一致</span></label>
+    </div>
+  </div>
+  <div class="muted" id="status">読み込み中…</div>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <div class="muted" id="hint">検索結果がここに表示されます。</div>
+  <!-- PC用テーブル -->
+  <div id="table"></div>
+  <!-- モバイル用2行リスト -->
+  <div id="mblist" class="mobile-list" style="display:none;"></div>
+</div>
+
+<div id="toast" class="toast">コピーしました</div>
+
+<script>
+  // ===== 設定（SHEET_ID は確定。GID は必要に応じて差し替え） =====
+  const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
+  const GID = '0'; // ← 表示したいタブを開いたURLの gid= の数字に置き換えてください
+  const MAX_FETCH_ROWS = 5000;
+
+  // gviz JSONP（Cookie不要・ITP非依存）
+  function buildGvizUrl() {
+    // A:アーティスト B:曲名 C:備考 D:直リンク（備考は取得のみ・表示しない）
+    const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
+    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
+  }
+
+  const state = { rows: [], debounce: null };
+
+  // JSONP コールバック
+  function onGviz(resp) {
+    try {
+      const table = resp.table;
+      const raw = (table.rows || []).map(r => [
+        (r.c && r.c[0] && r.c[0].v) || '', // アーティスト
+        (r.c && r.c[1] && r.c[1].v) || '', // 曲名
+        (r.c && r.c[3] && r.c[3].v) || '', // 直リンク（D列）※Cは取得しても使わない
+      ]);
+
+      // 先頭3行スキップ & A/Bに実文字がある行のみ残す
+      const rows = raw.slice(3).filter(([a, b]) => ((a || '') + (b || '')).trim() !== '');
+
+      state.rows = rows; // [artist, title, link]
+      $('status').textContent = `読み込み完了：${rows.length}件`;
+      render();
+    } catch (e) {
+      $('status').textContent = '読み込みに失敗しました';
+      console.error(e);
+    }
+  }
+  window.onGviz = onGviz;
+
+  // 正規化
+  function normalize(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); }
+  function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 200); }
+
+  // 描画（PC=テーブル／スマホ=2行カード）
+  function render(){
+    const tableWrap = $('table'); tableWrap.innerHTML = '';
+    const listWrap  = $('mblist'); listWrap.innerHTML = '';
+    const hint = $('hint');
+
+    const q = normalize($('q').value || '');
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    const limit = parseInt($('limit').value, 10);
+
+    let filtered = state.rows;
+    if (q) {
+      filtered = filtered.filter(([artist, title]) => {
+        const a = normalize(artist), t = normalize(title);
+        return mode === 'prefix' ? (a.startsWith(q) || t.startsWith(q)) : (a.includes(q) || t.includes(q));
+      });
+    }
+    const rows = filtered.slice(0, limit);
+
+    $('status').textContent = q ? `${rows.length}件ヒット（全${filtered.length}件）` : `表示中 ${rows.length}件（全${state.rows.length}件）`;
+    if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
+    hint.textContent = '';
+
+    /* ==== PC：テーブル（備考列なし） ==== */
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    ['アーティスト名','曲名','歌枠直リンク','コピー'].forEach(h=>{
+      const th = document.createElement('th'); th.textContent = h; trh.appendChild(th);
+    });
+    thead.appendChild(trh); table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach(([artist, title, link])=>{
+      const tr = document.createElement('tr');
+
+      let td = document.createElement('td'); td.textContent = artist || ''; tr.appendChild(td);
+      td = document.createElement('td'); td.textContent = title || ''; tr.appendChild(td);
+
+      // 歌枠直リンク（D列のURLをhrefに、表示は常に「▶」）
+      td = document.createElement('td');
+      if (/^https?:\/\/\S+$/i.test(link || '')) {
+        const a = document.createElement('a');
+        a.href = link; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = '▶'; a.setAttribute('aria-label','リンクを開く'); a.title='リンクを開く';
+        a.className = 'link-icon';
+        td.appendChild(a);
+      } else { td.textContent = ''; }
+      tr.appendChild(td);
+
+      // コピー列（「曲名 / アーティスト名」をコピー）
+      const tdOp = document.createElement('td');
+      const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
+      btn.addEventListener('click', ()=> copyPair(title, artist));
+      tdOp.appendChild(btn); tr.appendChild(tdOp);
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+
+    /* ==== スマホ：2行カード（備考なし） ==== */
+    rows.forEach(([artist, title, link])=>{
+      const item = document.createElement('div');
+      item.className = 'item';
+
+      const l1 = document.createElement('div');
+      l1.className = 'l1';
+      const a1 = document.createElement('span'); a1.className='artist'; a1.textContent = artist || '';
+      const sep = document.createElement('span'); sep.className='sep'; sep.textContent = '/';
+      const t1 = document.createElement('span'); t1.className='title'; t1.textContent = title || '';
+      l1.appendChild(a1); l1.appendChild(sep); l1.appendChild(t1);
+
+      const l2 = document.createElement('div');
+      l2.className = 'l2';
+      const ops = document.createElement('div'); ops.className='ops';
+
+      if (/^https?:\/\/\S+$/i.test(link || '')) {
+        const a = document.createElement('a');
+        a.href = link; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = '▶'; a.setAttribute('aria-label','リンクを開く'); a.title='リンクを開く';
+        a.className = 'link-icon';
+        ops.appendChild(a);
+      }
+      const btn = document.createElement('button'); btn.className='btn'; btn.textContent='コピー';
+      btn.addEventListener('click', ()=> copyPair(title, artist));
+      ops.appendChild(btn);
+
+      l2.appendChild(ops);
+      item.appendChild(l1); item.appendChild(l2);
+      listWrap.appendChild(item);
+    });
+
+    listWrap.style.display = 'block';
+  }
+
+  async function copyPair(title, artist){
+    const text = `${(title||'').trim()} / ${(artist||'').trim()}`.trim();
+    try{
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+      showToast('コピーしました：' + text);
+    } catch { showToast('コピーに失敗しました'); }
+  }
+
+  function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); }
+  function $(id){ return document.getElementById(id); }
+
+  // JSONP 取得開始
+  (function load(){
+    const s = document.createElement('script');
+    s.src = buildGvizUrl();
+    s.onerror = ()=> { $('status').textContent = 'データ取得に失敗しました'; };
+    document.head.appendChild(s);
+  })();
+
+  // イベント
+  $('q').addEventListener('input', scheduleSearch);
+  $('limit').addEventListener('change', render);
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', render));
+</script>
+</body>
+</html>
