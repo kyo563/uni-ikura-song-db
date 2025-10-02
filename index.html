@@ -7,7 +7,7 @@
   <title>歌唱曲一覧（スマホ対応・2行表示・コピー可）</title>
 
   <style>
-    /* ========= ベーススタイル（可読性重視） ========= */
+    /* ========= ベーススタイル ========= */
     :root{
       --bg: #ffb744;      /* 背景 */
       --card: #ffffff;    /* カード背景 */
@@ -15,7 +15,7 @@
       --muted: #6b7280;   /* 補助文字 */
       --line: #e5e7eb;    /* 罫線 */
       --thead: #ffe0b5;   /* テーブル見出し背景 */
-      --focus: #3897c9;   /* フォーカスリング（ご指定色） */
+      --focus: #3897c9;   /* フォーカスリング */
       --chip-bg: #f3f4f6; /* チップ背景 */
       --chip-text: #111827; /* チップ文字 */
     }
@@ -66,9 +66,6 @@
       line-height: 1.2;
       max-width: 160px;
     }
-    @supports (-webkit-touch-callout: none) {
-      #limit { padding-top: 5px; padding-bottom: 5px; }
-    }
 
     .muted { color: var(--muted); font-size: 13px; }
 
@@ -107,7 +104,7 @@
       z-index: 1;
       font-weight: 700;
     }
-    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋D小チップ（▶前回）＋コピー） */
+    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋「▶前回」＋コピー） */
     th:nth-child(1), td:nth-child(1) { width: 30%; }
     th:nth-child(2), td:nth-child(2) { width: 50%; }
     th:nth-child(3), td:nth-child(3) { width: 20%; }
@@ -118,7 +115,7 @@
       gap: 8px; flex-wrap: wrap;
     }
 
-    /* 汎用チップ（C/D表示用） */
+    /* チップ（C列/D列表示用） */
     .chip {
       display: inline-flex; align-items: center;
       max-width: 100%;
@@ -135,8 +132,8 @@
     }
     .chip a { color: inherit; text-decoration: underline; }
 
-    /* D列専用の小チップ（▶前回）— 表示ラベルのみ変更、サイズは .chip に準拠 */
-    .chip--d { padding: 2px 6px; } /* 視覚的にややコンパクト */
+    /* D専用（▶前回）— 視覚的にわずかにコンパクト */
+    .chip--d { padding: 2px 6px; }
 
     /* ========= スマホ：2行カード表示 ========= */
     @media (max-width: 768px) {
@@ -188,129 +185,13 @@
   <div id="toast" class="toast" role="status" aria-live="polite">コピーしました</div>
 
   <script>
-    /* ===== 設定 ===== */
-    const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
-    const GID = '0';                 // 表示したいタブの gid に差し替えてください
-    const MAX_FETCH_ROWS = 5000;
-    const HARD_LIMIT = 200;          // 内部上限（最大200件）
-
-    function buildGvizUrl() {
-      // A:アーティスト B:曲名 C:自由文字（備考等・リッチテキストの可能性） D:自由文字/リンク（リッチテキストの可能性）
-      const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
-      return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
-    }
+    /* ===== 設定（GASのJSONPエンドポイント） ===== */
+    const API_URL = 'https://script.google.com/macros/s/AKfycbye3u5CLItDwsvmk7Ex8ZTtDTm-_KlQ6xGTMtHBwxdI3WUgFOQVIW16F4tPv04dAq8bFg/exec';
 
     const state = { rows: [], debounce: null };
 
-    /* === UIリンク（cell.p）を試行的に抽出（gvizが返せば拾える） === */
-    function extractUiLinkFromProps(cell){
-      if (!cell || !cell.p || typeof cell.p !== 'object') return '';
-      const p = cell.p;
-      if (typeof p.hyperlink === 'string') return p.hyperlink.trim();
-      if (typeof p.link === 'string') return p.link.trim();
-      if (p.link && typeof p.link.url === 'string') return p.link.url.trim();
-      if (p.hyperlink && typeof p.hyperlink.url === 'string') return p.hyperlink.url.trim();
-      for (const k of Object.keys(p)) {
-        const v = p[k];
-        if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v.trim();
-        if (v && typeof v.url === 'string' && /^https?:\/\//i.test(v.url)) return v.url.trim();
-      }
-      return '';
-    }
-
-    /* === D列の主URL抽出：UIリンク > HYPERLINK関数 > 生URL === */
-    function extractUrl(cell) {
-      if (!cell) return '';
-      const viaProps = extractUiLinkFromProps(cell);
-      if (viaProps) return viaProps;
-
-      // 数式（HYPERLINK / aタグ）
-      if (typeof cell.f === 'string') {
-        let m = cell.f.match(/HYPERLINK\(\s*"([^"]+)"/i);
-        if (m) return m[1].trim();
-        m = cell.f.match(/HYPERLINK\(\s*'([^']+)'/i);
-        if (m) return m[1].trim();
-        m = cell.f.match(/href="([^"]+)"/i) || cell.f.match(/href=\\"([^\\"]+)\\"/i);
-        if (m) return m[1].trim();
-        m = cell.f.match(/HYPERLINK\(&quot;([^&]+)&quot;/i);
-        if (m) return m[1].trim();
-      }
-      // 生URL
-      if (typeof cell.v === 'string' && /^https?:\/\//i.test(cell.v)) return cell.v.trim();
-      return '';
-    }
-
-    /* === セル内アンカー（HYPERLINK/HTML/props）の抽出 === */
-    function extractAnchors(cell) {
-      const out = [];
-      if (!cell) return out;
-
-      // 1) UIリンク（cell.p）
-      const hrefP = extractUiLinkFromProps(cell);
-      if (hrefP) out.push({ href: hrefP, text: (typeof cell.v === 'string' ? cell.v : hrefP) });
-
-      // 2) 数式内の HYPERLINK / aタグ
-      const f = typeof cell.f === 'string' ? cell.f : '';
-      let m;
-      const re1 = /HYPERLINK\(\s*"([^"]+)"\s*,\s*"([^"]*)"\s*\)/ig;
-      while ((m = re1.exec(f)) !== null) out.push({ href: m[1], text: m[2] || m[1] });
-      const re2 = /HYPERLINK\(\s*'([^']+)'\s*,\s*'([^']*)'\s*\)/ig;
-      while ((m = re2.exec(f)) !== null) out.push({ href: m[1], text: m[2] || m[1] });
-      const re3 = /<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/ig;
-      while ((m = re3.exec(f)) !== null) out.push({ href: m[1], text: stripHtml(m[2]) || m[1] });
-
-      return out;
-    }
-    function stripHtml(s){ const d=document.createElement('div'); d.innerHTML=s; return d.textContent || d.innerText || ''; }
-
-    /* === プレーンテキストURL自動リンク化 === */
-    function linkifyText(text) {
-      const frag = document.createDocumentFragment();
-      if (!text) return frag;
-      const re = /(https?:\/\/[^\s]+)/g;
-      let last = 0; let m;
-      while ((m = re.exec(text)) !== null) {
-        if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
-        const a = document.createElement('a');
-        a.href = m[1]; a.target = '_blank'; a.rel = 'noopener';
-        a.textContent = m[1];
-        frag.appendChild(a);
-        last = re.lastIndex;
-      }
-      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
-      return frag;
-    }
-
-    /* ===== gviz JSONP コールバック ===== */
-    function onGviz(resp) {
-      try {
-        const table = resp.table;
-        const raw = (table.rows || []).map(r => {
-          const c = r.c || [];
-          const artist   = (c[0] && c[0].v) || '';
-          const title    = (c[1] && c[1].v) || '';
-          const noteCell = c[2] || null;  // C
-          const linkCell = c[3] || null;  // D
-          const url      = extractUrl(linkCell); // Dの主URL（保険として保持）
-          return [artist, title, noteCell, linkCell, url];
-        });
-
-        // 先頭3行スキップ & A/Bどちらかに文字がある行のみ
-        const rows = raw.slice(3).filter(([a, b]) => ((a || '') + (b || '')).trim() !== '');
-
-        state.rows = rows; // [artist, title, noteCell, linkCell, url]
-        $('status').textContent = `読み込み完了：${rows.length}件`;
-        render();
-      } catch (e) {
-        $('status').textContent = '読み込みに失敗しました';
-        console.error(e);
-      }
-    }
-    window.onGviz = onGviz;
-
-    /* ===== ユーティリティ ===== */
+    /* ===== 文字列ユーティリティ ===== */
     function normalize(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); }
-    function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 220); }
     function $(id){ return document.getElementById(id); }
 
     function showToast(msg){
@@ -333,57 +214,44 @@
       }
     }
 
-    /* === Cセルのチップ生成（リッチテキスト／UIリンク／自動リンク化に対応） === */
-    function buildChipsFromC(cell) {
-      const chips = [];
-      if (!cell) return chips;
-
-      const anchors = extractAnchors(cell);
-      const text = (typeof cell.v === 'string' ? cell.v.trim() : '');
-
-      if (anchors.length > 0) {
-        anchors.forEach(({href, text: label}) => {
-          const a = document.createElement('a');
-          a.href = href; a.target = '_blank'; a.rel = 'noopener';
-          a.className = 'chip';
-          a.textContent = label || href;
-          chips.push(a);
-        });
-      } else if (text) {
-        const span = document.createElement('span');
-        span.className = 'chip';
-        span.appendChild(linkifyText(text));
-        chips.push(span);
-      }
-      return chips;
-    }
-
-    /* === Dセルの「▶前回」小チップ生成（コピー左隣、リンクがあれば a 要素） === */
-    function buildChipFromD(cell) {
-      if (!cell) return null;
-
-      const hasText = typeof cell.v === 'string' && cell.v.trim() !== '';
-      const anchors = extractAnchors(cell);
-      const urlFromAnchors = anchors.length > 0 ? anchors[0].href : '';
-      const url = urlFromAnchors || extractUrl(cell);
-
-      if (!hasText && !anchors.length && !url) return null;
-
-      let el;
-      if (url) {
+    /* === プレーンテキストURL自動リンク化（Cテキストの保険） === */
+    function linkifyText(text) {
+      const frag = document.createDocumentFragment();
+      if (!text) return frag;
+      const re = /(https?:\/\/[^\s]+)/g;
+      let last = 0; let m;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
         const a = document.createElement('a');
-        a.href = url; a.target = '_blank'; a.rel = 'noopener';
-        a.className = 'chip chip--d';
-        a.textContent = '▶前回';
-        el = a;
-      } else {
-        const span = document.createElement('span');
-        span.className = 'chip chip--d';
-        span.textContent = '▶前回';
-        el = span;
+        a.href = m[1]; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = m[1];
+        frag.appendChild(a);
+        last = re.lastIndex;
       }
-      return el;
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      return frag;
     }
+
+    /* ===== JSONP 受け口（GAS → HTML） ===== */
+    function onGviz(payload){
+      try{
+        // GAS: { rows: [{artist,title,cText,cUrl,dText,dUrl}, ...] }
+        const rows = (payload.rows || []).map(r => [
+          r.artist || '', r.title || '',
+          r.cText || '', r.dText || '',
+          r.cUrl  || '', r.dUrl  || ''
+        ]);
+        // 格納形式: [artist, title, cText, dText, cUrl, dUrl]
+        state.rows = rows;
+        $('status').textContent = `読み込み完了：${rows.length}件`;
+        render();
+      } catch (e) {
+        $('status').textContent = '読み込みに失敗しました';
+        console.error(e);
+      }
+    }
+    // JSONP コールバックをグローバルに公開
+    window.onGviz = onGviz;
 
     /* ===== 描画（PC=テーブル／スマホ=2行カード） ===== */
     function render(){
@@ -393,11 +261,11 @@
 
       const q = normalize($('q').value || '');
       const limitSelected = parseInt($('limit').value, 10);
-      const limit = Math.min(isFinite(limitSelected) ? limitSelected : 50, HARD_LIMIT);
+      const limit = Math.min(isFinite(limitSelected) ? limitSelected : 50, 200);
 
       let filtered = state.rows;
       if (q) {
-        // 常に部分一致
+        // 常に部分一致：アーティスト or 曲名
         filtered = filtered.filter(([artist, title]) => {
           const a = normalize(artist), t = normalize(title);
           return a.includes(q) || t.includes(q);
@@ -422,23 +290,47 @@
       thead.appendChild(trh); table.appendChild(thead);
 
       const tbody = document.createElement('tbody');
-      rows.forEach(([artist, title, noteCell, linkCell, url])=>{
+      rows.forEach(([artist, title, cText, dText, cUrl, dUrl])=>{
         const tr = document.createElement('tr');
 
-        let td = document.createElement('td'); td.textContent = artist || ''; tr.appendChild(td);
-        td = document.createElement('td'); td.textContent = title || ''; tr.appendChild(td);
+        let td = document.createElement('td'); td.textContent = artist; tr.appendChild(td);
+        td = document.createElement('td'); td.textContent = title; tr.appendChild(td);
 
         const tdOps = document.createElement('td');
         const ops = document.createElement('div'); ops.className = 'ops';
 
-        // C列チップ
-        buildChipsFromC(noteCell).forEach(el => ops.appendChild(el));
+        /* C列のチップ：URLがあれば <a>、無ければテキストを自動リンク化した <span> */
+        if (cText) {
+          if (cUrl) {
+            const a = document.createElement('a');
+            a.href = cUrl; a.target = '_blank'; a.rel = 'noopener';
+            a.className = 'chip'; a.textContent = cText;
+            ops.appendChild(a);
+          } else {
+            const span = document.createElement('span');
+            span.className = 'chip';
+            span.appendChild(linkifyText(cText));
+            ops.appendChild(span);
+          }
+        }
 
-        // D小チップ（▶前回）— コピーの直前に配置（※大きい▶は削除）
-        const dChip = buildChipFromD(linkCell);
-        if (dChip) ops.appendChild(dChip);
+        /* D列の「▶前回」：dUrl があれば a、無ければ span（コピーの左隣） */
+        if (dText || dUrl) {
+          let dEl;
+          if (dUrl) {
+            const a = document.createElement('a');
+            a.href = dUrl; a.target = '_blank'; a.rel = 'noopener';
+            a.className = 'chip chip--d'; a.textContent = '▶前回';
+            dEl = a;
+          } else {
+            const span = document.createElement('span');
+            span.className = 'chip chip--d'; span.textContent = '▶前回';
+            dEl = span;
+          }
+          ops.appendChild(dEl);
+        }
 
-        // コピー
+        /* コピー */
         const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
         btn.addEventListener('click', ()=> copyPair(title, artist));
         ops.appendChild(btn);
@@ -451,21 +343,43 @@
       tableWrap.appendChild(table);
 
       /* ==== スマホ：2行カード（右端：Cチップ → D小チップ（▶前回） → コピー） ==== */
-      rows.forEach(([artist, title, noteCell, linkCell, url])=>{
+      rows.forEach(([artist, title, cText, dText, cUrl, dUrl])=>{
         const item = document.createElement('div'); item.className = 'item';
 
         const l1 = document.createElement('div'); l1.className = 'l1';
-        const a1 = document.createElement('span'); a1.className='artist'; a1.textContent = artist || '';
+        const a1 = document.createElement('span'); a1.className='artist'; a1.textContent = artist;
         const sep = document.createElement('span'); sep.className='sep'; sep.textContent = '/';
-        const t1 = document.createElement('span'); t1.className='title'; t1.textContent = title || '';
+        const t1 = document.createElement('span'); t1.className='title'; t1.textContent = title;
         l1.appendChild(a1); l1.appendChild(sep); l1.appendChild(t1);
 
         const l2 = document.createElement('div'); l2.className = 'l2';
 
-        buildChipsFromC(noteCell).forEach(el => l2.appendChild(el));
+        if (cText) {
+          if (cUrl) {
+            const a = document.createElement('a');
+            a.href = cUrl; a.target = '_blank'; a.rel = 'noopener';
+            a.className = 'chip'; a.textContent = cText;
+            l2.appendChild(a);
+          } else {
+            const span = document.createElement('span');
+            span.className = 'chip';
+            span.appendChild(linkifyText(cText));
+            l2.appendChild(span);
+          }
+        }
 
-        const dChip = buildChipFromD(linkCell);  // コピーの左隣
-        if (dChip) l2.appendChild(dChip);
+        if (dText || dUrl) {
+          if (dUrl) {
+            const a = document.createElement('a');
+            a.href = dUrl; a.target = '_blank'; a.rel = 'noopener';
+            a.className = 'chip chip--d'; a.textContent = '▶前回';
+            l2.appendChild(a);
+          } else {
+            const span = document.createElement('span');
+            span.className = 'chip chip--d'; span.textContent = '▶前回';
+            l2.appendChild(span);
+          }
+        }
 
         const btn = document.createElement('button'); btn.className='btn'; btn.textContent='コピー';
         btn.addEventListener('click', ()=> copyPair(title, artist));
@@ -478,15 +392,16 @@
       listWrap.style.display = 'block';
     }
 
-    /* ===== データ取得開始（gviz JSONP） ===== */
+    /* ===== データ取得開始（JSONPでGASを呼ぶ） ===== */
     (function load(){
       const s = document.createElement('script');
-      s.src = buildGvizUrl();
+      s.src = API_URL + '?callback=onGviz&v=' + Date.now(); // キャッシュ回避用パラメータ
       s.onerror = ()=> { $('status').textContent = 'データ取得に失敗しました'; };
       document.head.appendChild(s);
     })();
 
     /* ===== イベント ===== */
+    function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 220); }
     $('q').addEventListener('input', scheduleSearch);
     $('limit').addEventListener('change', render);
   </script>
