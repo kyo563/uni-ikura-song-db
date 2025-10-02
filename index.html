@@ -22,6 +22,48 @@
   .btn:active { transform:translateY(1px); }
   .toast { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:rgba(0,0,0,.8); color:#fff; padding:8px 12px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .2s; }
   .toast.show { opacity:1; }
+
+  /* モバイル時の列幅最適化（リンク列を最狭・中央寄せ・省略） */
+  @media (max-width: 768px) {
+    table { table-layout: fixed; }
+
+    /* 列配分：1=アーティスト 2=曲名 3=備考 4=リンク 5=コピー */
+    th:nth-child(1), td:nth-child(1) { width: 34%; }
+    th:nth-child(2), td:nth-child(2) { width: 34%; }
+    th:nth-child(3), td:nth-child(3) { width: 24%; }
+
+    /* 歌枠直リンクを最も狭く（中央寄せ・省略OK） */
+    th:nth-child(4), td:nth-child(4) {
+      width: 8%;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    td:nth-child(4) a {
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* コピー列も固定幅で狭める */
+    th:nth-child(5), td:nth-child(5) { width: 72px; }
+  }
+
+  /* ▶ アイコンの見た目とタップしやすさ */
+  .link-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;   /* タップ面積の確保 */
+    height: 32px;
+    line-height: 1;
+    text-decoration: none;
+    font-size: 18px;
+  }
+  .link-icon:active { transform: translateY(1px); }
 </style>
 </head>
 <body>
@@ -53,20 +95,24 @@
 <div id="toast" class="toast">コピーしました</div>
 
 <script>
-  // ===== 設定（SHEET_IDは反映済み。GIDは仮の 0。必要に応じて差し替え） =====
+  // ===== 設定（SHEET_ID は確定。GID は必要に応じて差し替え） =====
   const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
   const GID = '0'; // ← 表示したいタブを開いたURLの gid= の数字に置き換えてください
   const MAX_FETCH_ROWS = 5000;
 
+  // gviz JSONP（Cookie不要・ITP非依存）
   function buildGvizUrl() {
-    // 列は A,B,C,D（アーティスト/曲名/備考/直リンク）を想定
+    // 先頭3行を除外（offset 3）、空行は除外（AまたはBがnullでない）
+    // 列は A,B,C,D（アーティスト/曲名/備考/直リンク）想定
     const tq = encodeURIComponent(
-  `select A,B,C,D where A is not null or B is not null offset 3 limit ${MAX_FETCH_ROWS}`
+      `select A,B,C,D where A is not null or B is not null offset 3 limit ${MAX_FETCH_ROWS}`
+    );
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
   }
 
   const state = { rows: [], debounce: null };
 
+  // JSONP コールバック
   function onGviz(resp) {
     try {
       const table = resp.table;
@@ -87,9 +133,11 @@
   }
   window.onGviz = onGviz;
 
+  // 正規化
   function normalize(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); }
   function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 200); }
 
+  // 描画
   function render(){
     const container = $('table'); container.innerHTML = '';
     const hint = $('hint');
@@ -127,13 +175,24 @@
       td = document.createElement('td'); td.textContent = title || ''; tr.appendChild(td);
       td = document.createElement('td'); td.textContent = note || ''; tr.appendChild(td);
 
+      // 歌枠直リンク：URLは href のまま保持、表示は「▶」に短縮
       td = document.createElement('td');
-      if (/^https?:\/\/\S+$/i.test(link||'')) {
-        const a = document.createElement('a'); a.href = link; a.target = '_blank'; a.rel='noopener'; a.textContent = link;
+      if (/^https?:\/\/\S+$/i.test(link || '')) {
+        const a = document.createElement('a');
+        a.href = link;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = '▶';                 // 表示をURLではなく「▶」に
+        a.setAttribute('aria-label', 'リンクを開く');
+        a.title = 'リンクを開く';
+        a.className = 'link-icon';
         td.appendChild(a);
-      } else { td.textContent = link || ''; }
+      } else {
+        td.textContent = link || '';
+      }
       tr.appendChild(td);
 
+      // コピー列（「曲名 / アーティスト名」をコピー）
       const tdOp = document.createElement('td');
       const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
       btn.addEventListener('click', ()=> copyPair(title, artist));
@@ -157,6 +216,7 @@
   function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); }
   function $(id){ return document.getElementById(id); }
 
+  // JSONP 取得開始
   (function load(){
     const s = document.createElement('script');
     s.src = buildGvizUrl();
@@ -164,6 +224,7 @@
     document.head.appendChild(s);
   })();
 
+  // イベント
   $('q').addEventListener('input', scheduleSearch);
   $('limit').addEventListener('change', render);
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', render));
