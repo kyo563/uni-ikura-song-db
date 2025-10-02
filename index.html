@@ -100,11 +100,8 @@
 
   // gviz JSONP（Cookie不要・ITP非依存）
   function buildGvizUrl() {
-    // 先頭3行を除外（offset 3）、空行は除外（AまたはBがnullでない）
-    // 列は A,B,C,D（アーティスト/曲名/備考/直リンク）想定
-  const tq = encodeURIComponent(
-  `select A,B,C,D where A is not null or B is not null limit ${MAX_FETCH_ROWS} offset 3`
-);
+    // 取得条件は最小化：列A,B,C,Dを最大件数だけ取得（除外はJSで実施）
+    const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
   }
 
@@ -114,13 +111,16 @@
   function onGviz(resp) {
     try {
       const table = resp.table;
-      const rows = (table.rows || []).map(r => {
-        const a = (r.c[0] && r.c[0].v) || ''; // アーティスト
-        const t = (r.c[1] && r.c[1].v) || ''; // 曲名
-        const n = (r.c[2] && r.c[2].v) || ''; // 備考
-        const l = (r.c[3] && r.c[3].v) || ''; // 直リンク
-        return [a, t, n, l];
-      });
+      const raw = (table.rows || []).map(r => [
+        (r.c && r.c[0] && r.c[0].v) || '', // アーティスト
+        (r.c && r.c[1] && r.c[1].v) || '', // 曲名
+        (r.c && r.c[2] && r.c[2].v) || '', // 備考
+        (r.c && r.c[3] && r.c[3].v) || '', // 直リンク
+      ]);
+
+      // ★ここで整形：先頭3行スキップ & A/Bのどちらかに実文字がある行のみ残す
+      const rows = raw.slice(3).filter(([a, b]) => ((a || '') + (b || '')).trim() !== '');
+
       state.rows = rows;
       $('status').textContent = `読み込み完了：${rows.length}件`;
       render();
