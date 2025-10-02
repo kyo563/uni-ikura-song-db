@@ -9,13 +9,13 @@
   <style>
     /* ========= ベーススタイル（可読性重視） ========= */
     :root{
-      --bg: #ffb744;      /* 背景 */
+      --bg: #ffb744;      /* 背景（ご指定色） */
       --card: #ffffff;    /* カード背景 */
       --text: #1a1a1a;    /* 文字色（濃いめ） */
       --muted: #6b7280;   /* 補助文字 */
       --line: #e5e7eb;    /* 罫線 */
       --thead: #ffe0b5;   /* テーブル見出し背景（背景色に合わせた淡色） */
-      --focus: #7c3aed;   /* フォーカスリング（視認性確保） */
+      --focus: #7c3aed;   /* フォーカスリング */
     }
 
     * { box-sizing: border-box; }
@@ -54,17 +54,6 @@
     a.link-icon:focus {
       outline: 3px solid var(--focus);
       outline-offset: 2px;
-    }
-
-    .pill {
-      display: inline-flex; gap: 8px; background: #fafafa;
-      border-radius: 999px; padding: 6px; margin: 8px 0;
-      border: 1px solid var(--line);
-    }
-    .pill label { padding: 6px 10px; border-radius: 999px; cursor: pointer; }
-    .pill input[type="radio"]{ display:none; }
-    .pill input[type="radio"]:checked + span {
-      background: #fff; border: 1px solid var(--line); border-radius: 999px;
     }
 
     .muted { color: var(--muted); font-size: 13px; }
@@ -161,11 +150,9 @@
       <select id="limit" style="max-width:160px;">
         <option value="50">上限 50件</option>
         <option value="100">上限 100件</option>
+        <option value="200">上限 200件</option>
       </select>
-      <div class="pill">
-        <label><input type="radio" name="mode" value="contains" checked><span>部分一致</span></label>
-        <label><input type="radio" name="mode" value="prefix"><span>前方一致</span></label>
-      </div>
+      <!-- 前方一致/部分一致の切替UIは削除しました（常に部分一致） -->
     </div>
     <div class="muted" id="status">読み込み中…</div>
   </div>
@@ -186,6 +173,7 @@
     const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
     const GID = '0';                 // 表示したいタブの gid に差し替えてください
     const MAX_FETCH_ROWS = 5000;
+    const HARD_LIMIT = 200;          // 内部上限（最大200件）
 
     function buildGvizUrl() {
       // A:アーティスト B:曲名 C:備考 D:直リンク（備考は取得のみ・表示しない）
@@ -199,13 +187,12 @@
     function extractUrl(cell) {
       if (!cell) return '';
 
-      // 1) UIの「リンクを挿入」で付与（properties に入ることがある）
+      // 1) UIの「リンクを挿入」で付与（properties）
       if (cell.p && typeof cell.p === 'object') {
         if (typeof cell.p.hyperlink === 'string') return cell.p.hyperlink.trim();
         if (typeof cell.p.link === 'string') return cell.p.link.trim();
         if (cell.p.link && typeof cell.p.link.url === 'string') return cell.p.link.url.trim();
         if (cell.p.hyperlink && typeof cell.p.hyperlink.url === 'string') return cell.p.hyperlink.url.trim();
-        // 保険：表記ゆれキーの総当たり
         for (const k of Object.keys(cell.p)) {
           const v = cell.p[k];
           if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v.trim();
@@ -290,19 +277,23 @@
       const hint = $('hint');
 
       const q = normalize($('q').value || '');
-      const mode = document.querySelector('input[name="mode"]:checked').value;
-      const limit = parseInt($('limit').value, 10);
+      const limitSelected = parseInt($('limit').value, 10);
+      const limit = Math.min(isFinite(limitSelected) ? limitSelected : 50, HARD_LIMIT); // 最大200件に制限
 
       let filtered = state.rows;
       if (q) {
+        // 常に部分一致
         filtered = filtered.filter(([artist, title]) => {
           const a = normalize(artist), t = normalize(title);
-          return mode === 'prefix' ? (a.startsWith(q) || t.startsWith(q)) : (a.includes(q) || t.includes(q));
+          return a.includes(q) || t.includes(q);
         });
       }
       const rows = filtered.slice(0, limit);
 
-      $('status').textContent = q ? `${rows.length}件ヒット（全${filtered.length}件）` : `表示中 ${rows.length}件（全${state.rows.length}件）`;
+      $('status').textContent = q
+        ? `${rows.length}件ヒット（全${filtered.length}件）／表示上限 ${limit}件`
+        : `表示中 ${rows.length}件（全${state.rows.length}件）／表示上限 ${limit}件`;
+
       if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
       hint.textContent = '';
 
@@ -385,7 +376,6 @@
     /* ===== イベント ===== */
     $('q').addEventListener('input', scheduleSearch);
     $('limit').addEventListener('change', render);
-    document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', render));
   </script>
 </body>
 </html>
