@@ -24,14 +24,14 @@
   .toast { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:rgba(0,0,0,.8); color:#fff; padding:8px 12px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .2s; }
   .toast.show { opacity:1; }
 
-  /* ▶ アイコン（歌枠直リンク）の見た目とタップしやすさ */
+  /* ▶ アイコン（歌枠直リンク） */
   .link-icon {
     display:inline-flex; align-items:center; justify-content:center;
     width:36px; height:36px; line-height:1; text-decoration:none; font-size:18px;
   }
   .link-icon:active { transform: translateY(1px); }
 
-  /* ===== スマホ：2行カード表示（備考なし） ===== */
+  /* スマホ：2行カード表示（備考なし） */
   @media (max-width: 768px) {
     table { display:none; }
     .mobile-list { display:block; margin-top:8px; }
@@ -39,22 +39,18 @@
       border-bottom:1px solid #eee; padding:10px 6px;
       display:flex; flex-direction:column; gap:6px;
     }
-    .l1 { /* 1行目：アーティスト / 曲名（太字） */
-      font-size:15px; line-height:1.5; font-weight:600; display:flex; gap:6px; flex-wrap:wrap;
-    }
+    .l1 { font-size:15px; line-height:1.5; font-weight:600; display:flex; gap:6px; flex-wrap:wrap; }
     .l1 .sep { opacity:.6; }
-    .l2 { /* 2行目：右端に ▶ → コピー */
-      display:flex; align-items:center; gap:8px; justify-content:flex-end;
-    }
+    .l2 { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
     .btn { padding:6px 10px; font-size:13px; }
   }
 
-  /* ===== PC：テーブル（備考列なし・曲名広め） ===== */
+  /* PC：テーブル（備考なし・曲名広め） */
   @media (min-width: 769px) {
     table { table-layout: fixed; }
-    /* 列配分：1=アーティスト 2=曲名 3=リンク 4=コピー */
+    /* 1=アーティスト 2=曲名 3=リンク 4=コピー */
     th:nth-child(1), td:nth-child(1) { width: 30%; }
-    th:nth-child(2), td:nth-child(2) { width: 60%; } /* 曲名を広く */
+    th:nth-child(2), td:nth-child(2) { width: 60%; }
     th:nth-child(3), td:nth-child(3) {
       width: 5%; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
@@ -84,9 +80,7 @@
 
 <div class="card" style="margin-top:12px;">
   <div class="muted" id="hint">検索結果がここに表示されます。</div>
-  <!-- PC用テーブル -->
   <div id="table"></div>
-  <!-- モバイル用2行リスト -->
   <div id="mblist" class="mobile-list" style="display:none;"></div>
 </div>
 
@@ -106,18 +100,17 @@
 
   const state = { rows: [], debounce: null };
 
-  /* === D列の「ハイパーリンクURLのみ」を抽出（生URLは無視） === */
-  function extractHyperlinkUrl(cell) {
+  /* === D列のURL抽出：ハイパーリンク優先、無ければ生URLを採用 === */
+  function extractUrl(cell) {
     if (!cell) return '';
 
-    // 1) UIの「リンクを挿入」で付与されたリンク（propertiesに入るケース）
+    // 1) UIの「リンクを挿入」で付与（properties）
     if (cell.p && typeof cell.p === 'object') {
-      // 代表的なキー
       if (typeof cell.p.hyperlink === 'string') return cell.p.hyperlink.trim();
       if (typeof cell.p.link === 'string') return cell.p.link.trim();
       if (cell.p.link && typeof cell.p.link.url === 'string') return cell.p.link.url.trim();
       if (cell.p.hyperlink && typeof cell.p.hyperlink.url === 'string') return cell.p.hyperlink.url.trim();
-      // 表記ゆれも走査
+      // 表記ゆれの保険
       for (const k of Object.keys(cell.p)) {
         const v = cell.p[k];
         if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v.trim();
@@ -125,22 +118,23 @@
       }
     }
 
-    // 2) HYPERLINK() 関数で付いたリンク（式からURLを抽出）
+    // 2) HYPERLINK() 関数（数式）から抽出
     if (typeof cell.f === 'string') {
-      // =HYPERLINK("URL","表示名") / =HYPERLINK('URL','表示名')
       let m = cell.f.match(/HYPERLINK\(\s*"([^"]+)"/i);
       if (m) return m[1].trim();
       m = cell.f.match(/HYPERLINK\(\s*'([^']+)'/i);
       if (m) return m[1].trim();
-      // gvizがHTML化する場合の <a href="..."> / エスケープにも対応
       m = cell.f.match(/href="([^"]+)"/i) || cell.f.match(/href=\\"([^\\"]+)\\"/i);
       if (m) return m[1].trim();
-      // &quot; エスケープ
       m = cell.f.match(/HYPERLINK\(&quot;([^&]+)&quot;/i);
       if (m) return m[1].trim();
     }
 
-    // 3) cell.v が http でも、ハイパーリンクでなければ採用しない
+    // 3) 生URL（文字列値）が http/https なら採用
+    if (typeof cell.v === 'string' && /^https?:\/\//i.test(cell.v)) {
+      return cell.v.trim();
+    }
+
     return '';
   }
 
@@ -152,7 +146,7 @@
         const c = r.c || [];
         const artist = (c[0] && c[0].v) || '';
         const title  = (c[1] && c[1].v) || '';
-        const url    = extractHyperlinkUrl(c[3] || null); // ★ D列の「ハイパーリンクURLのみ」
+        const url    = extractUrl(c[3] || null);  // D列からURL（ハイパーリンク優先・無ければ生URL）
         return [artist, title, url];
       });
 
@@ -212,7 +206,7 @@
       let td = document.createElement('td'); td.textContent = artist || ''; tr.appendChild(td);
       td = document.createElement('td'); td.textContent = title || ''; tr.appendChild(td);
 
-      // 歌枠直リンク（ハイパーリンクURLがある行のみ ▶ を表示）
+      // 歌枠直リンク：URLがある行のみ ▶ を表示
       td = document.createElement('td');
       if (url) {
         const a = document.createElement('a');
