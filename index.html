@@ -14,6 +14,7 @@
   .pill label { padding:6px 10px; border-radius:999px; }
   .pill input[type="radio"]{ display:none; }
   .pill input[type="radio"]:checked + span { background:#fff; border:1px solid #ddd; border-radius:999px; }
+
   table { width:100%; border-collapse:collapse; margin-top:8px; }
   th,td { border-bottom:1px solid #eee; padding:8px 6px; font-size:14px; word-break:break-word; vertical-align:top; }
   th { position:sticky; top:0; background:#fafafa; z-index:1; }
@@ -23,13 +24,14 @@
   .toast { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:rgba(0,0,0,.8); color:#fff; padding:8px 12px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .2s; }
   .toast.show { opacity:1; }
 
+  /* ▶ アイコン（歌枠直リンク）の見た目とタップしやすさ */
   .link-icon {
     display:inline-flex; align-items:center; justify-content:center;
     width:36px; height:36px; line-height:1; text-decoration:none; font-size:18px;
   }
   .link-icon:active { transform: translateY(1px); }
 
-  /* スマホ：2行カード表示 */
+  /* ===== スマホ：2行カード表示（備考なし） ===== */
   @media (max-width: 768px) {
     table { display:none; }
     .mobile-list { display:block; margin-top:8px; }
@@ -37,18 +39,22 @@
       border-bottom:1px solid #eee; padding:10px 6px;
       display:flex; flex-direction:column; gap:6px;
     }
-    .l1 { font-size:15px; line-height:1.5; font-weight:600; display:flex; gap:6px; flex-wrap:wrap; }
+    .l1 { /* 1行目：アーティスト / 曲名（太字） */
+      font-size:15px; line-height:1.5; font-weight:600; display:flex; gap:6px; flex-wrap:wrap;
+    }
     .l1 .sep { opacity:.6; }
-    .l2 { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
+    .l2 { /* 2行目：右端に ▶ → コピー */
+      display:flex; align-items:center; gap:8px; justify-content:flex-end;
+    }
     .btn { padding:6px 10px; font-size:13px; }
   }
 
-  /* PC：テーブル（備考なし） */
+  /* ===== PC：テーブル（備考列なし・曲名広め） ===== */
   @media (min-width: 769px) {
     table { table-layout: fixed; }
-    /* 1=アーティスト 2=曲名 3=リンク 4=コピー */
+    /* 列配分：1=アーティスト 2=曲名 3=リンク 4=コピー */
     th:nth-child(1), td:nth-child(1) { width: 30%; }
-    th:nth-child(2), td:nth-child(2) { width: 60%; }
+    th:nth-child(2), td:nth-child(2) { width: 60%; } /* 曲名を広く */
     th:nth-child(3), td:nth-child(3) {
       width: 5%; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
@@ -78,7 +84,9 @@
 
 <div class="card" style="margin-top:12px;">
   <div class="muted" id="hint">検索結果がここに表示されます。</div>
+  <!-- PC用テーブル -->
   <div id="table"></div>
+  <!-- モバイル用2行リスト -->
   <div id="mblist" class="mobile-list" style="display:none;"></div>
 </div>
 
@@ -87,58 +95,52 @@
 <script>
   /* ===== 設定 ===== */
   const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
-  const GID = '0';              // 表示タブの gid
+  const GID = '0';              // 表示タブの gid に差し替えてください
   const MAX_FETCH_ROWS = 5000;
 
   function buildGvizUrl() {
+    // A:アーティスト B:曲名 C:備考 D:直リンク（備考は取得のみ・表示しない）
     const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
   }
 
   const state = { rows: [], debounce: null };
 
-  /* === D列のURLを最大限取りこぼさない抽出関数 === */
-  function extractUrl(cell) {
+  /* === D列の「ハイパーリンクURLのみ」を抽出（生URLは無視） === */
+  function extractHyperlinkUrl(cell) {
     if (!cell) return '';
 
-    // 0) プロパティ経由（UIの「リンクを挿入」で付いたリンク）
+    // 1) UIの「リンクを挿入」で付与されたリンク（propertiesに入るケース）
     if (cell.p && typeof cell.p === 'object') {
+      // 代表的なキー
       if (typeof cell.p.hyperlink === 'string') return cell.p.hyperlink.trim();
       if (typeof cell.p.link === 'string') return cell.p.link.trim();
       if (cell.p.link && typeof cell.p.link.url === 'string') return cell.p.link.url.trim();
       if (cell.p.hyperlink && typeof cell.p.hyperlink.url === 'string') return cell.p.hyperlink.url.trim();
-      // 稀に { "link": "https://..." } や { "hyperlink": "https://..." } のケースがある
-      if (cell.p['hyperlink']) {
-        const hv = cell.p['hyperlink'];
-        if (typeof hv === 'string') return hv.trim();
-        if (hv && typeof hv.url === 'string') return hv.url.trim();
-      }
-      if (cell.p['link']) {
-        const lv = cell.p['link'];
-        if (typeof lv === 'string') return lv.trim();
-        if (lv && typeof lv.url === 'string') return lv.url.trim();
+      // 表記ゆれも走査
+      for (const k of Object.keys(cell.p)) {
+        const v = cell.p[k];
+        if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v.trim();
+        if (v && typeof v.url === 'string' && /^https?:\/\//i.test(v.url)) return v.url.trim();
       }
     }
 
-    // 1) HYPERLINK() 形式の式（例: HYPERLINK("URL","表示名")）
+    // 2) HYPERLINK() 関数で付いたリンク（式からURLを抽出）
     if (typeof cell.f === 'string') {
+      // =HYPERLINK("URL","表示名") / =HYPERLINK('URL','表示名')
       let m = cell.f.match(/HYPERLINK\(\s*"([^"]+)"/i);
       if (m) return m[1].trim();
       m = cell.f.match(/HYPERLINK\(\s*'([^']+)'/i);
       if (m) return m[1].trim();
-      // <a href="...">〜 や JSONエスケープ \" にも対応
+      // gvizがHTML化する場合の <a href="..."> / エスケープにも対応
       m = cell.f.match(/href="([^"]+)"/i) || cell.f.match(/href=\\"([^\\"]+)\\"/i);
       if (m) return m[1].trim();
-      // &quot; でエスケープされたケース
+      // &quot; エスケープ
       m = cell.f.match(/HYPERLINK\(&quot;([^&]+)&quot;/i);
       if (m) return m[1].trim();
     }
 
-    // 2) 生URLが値に入っている
-    if (typeof cell.v === 'string' && /^https?:\/\//i.test(cell.v)) {
-      return cell.v.trim();
-    }
-
+    // 3) cell.v が http でも、ハイパーリンクでなければ採用しない
     return '';
   }
 
@@ -150,13 +152,14 @@
         const c = r.c || [];
         const artist = (c[0] && c[0].v) || '';
         const title  = (c[1] && c[1].v) || '';
-        const url    = extractUrl(c[3] || null);  // ★ D列から厳密抽出
+        const url    = extractHyperlinkUrl(c[3] || null); // ★ D列の「ハイパーリンクURLのみ」
         return [artist, title, url];
       });
 
       // 先頭3行スキップ & A/Bどちらかに文字がある行のみ
       const rows = raw.slice(3).filter(([a, b]) => ((a || '') + (b || '')).trim() !== '');
-      state.rows = rows;
+
+      state.rows = rows; // [artist, title, url]
       $('status').textContent = `読み込み完了：${rows.length}件`;
       render();
     } catch (e) {
@@ -193,7 +196,7 @@
     if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
     hint.textContent = '';
 
-    /* PC：テーブル */
+    /* ==== PC：テーブル（備考なし） ==== */
     const table = document.createElement('table');
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
@@ -209,6 +212,7 @@
       let td = document.createElement('td'); td.textContent = artist || ''; tr.appendChild(td);
       td = document.createElement('td'); td.textContent = title || ''; tr.appendChild(td);
 
+      // 歌枠直リンク（ハイパーリンクURLがある行のみ ▶ を表示）
       td = document.createElement('td');
       if (url) {
         const a = document.createElement('a');
@@ -219,6 +223,7 @@
       } else { td.textContent = ''; }
       tr.appendChild(td);
 
+      // コピー列（「曲名 / アーティスト名」をコピー）
       const tdOp = document.createElement('td');
       const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
       btn.addEventListener('click', ()=> copyPair(title, artist));
@@ -229,7 +234,7 @@
     table.appendChild(tbody);
     tableWrap.appendChild(table);
 
-    /* スマホ：2行カード（2行目 右端に ▶ → コピー） */
+    /* ==== スマホ：2行カード（2行目 右端に ▶ → コピー） ==== */
     rows.forEach(([artist, title, url])=>{
       const item = document.createElement('div'); item.className = 'item';
 
@@ -273,6 +278,7 @@
   function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); }
   function $(id){ return document.getElementById(id); }
 
+  // JSONP 取得開始
   (function load(){
     const s = document.createElement('script');
     s.src = buildGvizUrl();
@@ -280,6 +286,7 @@
     document.head.appendChild(s);
   })();
 
+  // イベント
   $('q').addEventListener('input', scheduleSearch);
   $('limit').addEventListener('change', render);
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', render));
