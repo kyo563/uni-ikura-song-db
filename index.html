@@ -54,7 +54,6 @@
     input[type="search"]:focus,
     select:focus,
     .btn:focus,
-    a.link-icon:focus,
     .chip:focus {
       outline: 3px solid var(--focus);
       outline-offset: 2px;
@@ -80,7 +79,7 @@
       color: var(--text);
       border-radius: 10px;
       padding: 8px 12px;
-      font-size: 14px;       /* 14px */
+      font-size: 14px;       /* 統一：14px */
       cursor: pointer;
     }
     .btn:hover { background: #f9fafb; }
@@ -108,7 +107,7 @@
       z-index: 1;
       font-weight: 700;
     }
-    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋D小チップ（▶前回）＋▶＋コピー） */
+    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋D小チップ（▶前回）＋コピー） */
     th:nth-child(1), td:nth-child(1) { width: 30%; }
     th:nth-child(2), td:nth-child(2) { width: 50%; }
     th:nth-child(3), td:nth-child(3) { width: 20%; }
@@ -119,22 +118,13 @@
       gap: 8px; flex-wrap: wrap;
     }
 
-    /* ▶ アイコン（Dの主URL） */
-    .link-icon {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px; line-height: 1; text-decoration: none; font-size: 18px;
-      border-radius: 8px;
-    }
-    .link-icon:hover { background: #f3f4f6; }
-    .link-icon:active { transform: translateY(1px); }
-
     /* 汎用チップ（C/D表示用） */
     .chip {
       display: inline-flex; align-items: center;
       max-width: 100%;
       padding: 4px 8px;
       border-radius: 999px;
-      font-size: 14px;         /* 統一：14px（コピーと同等） */
+      font-size: 14px;         /* コピーと同等に統一 */
       background: var(--chip-bg);
       color: var(--chip-text);
       text-decoration: none;
@@ -162,7 +152,7 @@
         display: flex; gap: 6px; flex-wrap: wrap;
       }
       .l1 .sep { opacity: .6; }
-      .l2 { /* 2行目：右端に Cチップ → ▶ → D小チップ（▶前回） → コピー */
+      .l2 { /* 2行目：右端に Cチップ → D小チップ（▶前回） → コピー */
         display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
       }
       .btn { padding: 8px 12px; font-size: 14px; }
@@ -250,12 +240,12 @@
       return '';
     }
 
-    /* === セル内アンカー（HYPERLINK/HTML）の抽出 === */
+    /* === セル内アンカー（HYPERLINK/HTML/props）の抽出 === */
     function extractAnchors(cell) {
       const out = [];
       if (!cell) return out;
 
-      // 1) UIリンク（cell.p）を1件だけでも拾う（テキストは cell.v を使う）
+      // 1) UIリンク（cell.p）
       const hrefP = extractUiLinkFromProps(cell);
       if (hrefP) out.push({ href: hrefP, text: (typeof cell.v === 'string' ? cell.v : hrefP) });
 
@@ -301,7 +291,7 @@
           const title    = (c[1] && c[1].v) || '';
           const noteCell = c[2] || null;  // C
           const linkCell = c[3] || null;  // D
-          const url      = extractUrl(linkCell); // Dの主URL（▶）
+          const url      = extractUrl(linkCell); // Dの主URL（保険として保持）
           return [artist, title, noteCell, linkCell, url];
         });
 
@@ -422,7 +412,7 @@
       if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
       hint.textContent = '';
 
-      /* ==== PC：テーブル（操作列に Cチップ → ▶ → D小チップ（▶前回） → コピー） ==== */
+      /* ==== PC：テーブル（操作列に Cチップ → D小チップ（▶前回） → コピー） ==== */
       const table = document.createElement('table');
       const thead = document.createElement('thead');
       const trh = document.createElement('tr');
@@ -444,16 +434,7 @@
         // C列チップ
         buildChipsFromC(noteCell).forEach(el => ops.appendChild(el));
 
-        // ▶（D主URL）
-        if (url) {
-          const a = document.createElement('a');
-          a.href = url; a.target = '_blank'; a.rel = 'noopener';
-          a.textContent = '▶'; a.setAttribute('aria-label','リンクを開く'); a.title = 'リンクを開く';
-          a.className = 'link-icon';
-          ops.appendChild(a);
-        }
-
-        // D小チップ（▶前回）— コピーの直前に配置
+        // D小チップ（▶前回）— コピーの直前に配置（※大きい▶は削除）
         const dChip = buildChipFromD(linkCell);
         if (dChip) ops.appendChild(dChip);
 
@@ -469,7 +450,7 @@
       table.appendChild(tbody);
       tableWrap.appendChild(table);
 
-      /* ==== スマホ：2行カード（右端：Cチップ → ▶ → D小チップ（▶前回） → コピー） ==== */
+      /* ==== スマホ：2行カード（右端：Cチップ → D小チップ（▶前回） → コピー） ==== */
       rows.forEach(([artist, title, noteCell, linkCell, url])=>{
         const item = document.createElement('div'); item.className = 'item';
 
@@ -482,14 +463,6 @@
         const l2 = document.createElement('div'); l2.className = 'l2';
 
         buildChipsFromC(noteCell).forEach(el => l2.appendChild(el));
-
-        if (url) {
-          const a = document.createElement('a');
-          a.href = url; a.target = '_blank'; a.rel = 'noopener';
-          a.textContent = '▶'; a.setAttribute('aria-label','リンクを開く'); a.title='リンクを開く';
-          a.className = 'link-icon';
-          l2.appendChild(a);
-        }
 
         const dChip = buildChipFromD(linkCell);  // コピーの左隣
         if (dChip) l2.appendChild(dChip);
