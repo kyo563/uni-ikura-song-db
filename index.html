@@ -5,269 +5,97 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
   <meta name="theme-color" content="#ffb744">
   <title>歌唱曲一覧（スマホ対応・2行表示・コピー可）</title>
-
   <style>
-    /* ========= ベーススタイル ========= */
-    :root{
-      --bg: #ffb744;      /* 背景 */
-      --card: #ffffff;    /* カード背景 */
-      --text: #1a1a1a;    /* 文字色 */
-      --muted: #6b7280;   /* 補助文字 */
-      --line: #e5e7eb;    /* 罫線 */
-      --thead: #ffe0b5;   /* テーブル見出し背景 */
-      --focus: #3897c9;   /* フォーカスリング */
-      --chip-bg: #f3f4f6; /* チップ背景 */
-      --chip-text: #111827; /* チップ文字 */
-    }
-
-    * { box-sizing: border-box; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
-      line-height: 1.7;
-      margin: 12px;
-    }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 14px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.06);
-    }
-
-    .row { display: flex; gap: 10px; align-items: center; }
-    .row > * { flex: 1; }
-    .row-controls { margin-top: 8px; } /* 検索と上限の間に少し余白 */
-
-    input[type="search"], select {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      font-size: 16px;
-      background: #fff;
-      color: var(--text);
-      outline: none;
-    }
-    input[type="search"]:focus,
-    select:focus,
-    .btn:focus,
-    .chip:focus {
-      outline: 3px solid var(--focus);
-      outline-offset: 2px;
-    }
-
-    /* 上限セレクトをややコンパクトに */
-    #limit {
-      padding: 6px 10px;
-      font-size: 14px;
-      line-height: 1.2;
-      max-width: 160px;
-    }
-
-    .muted { color: var(--muted); font-size: 13px; }
-
-    .btn {
-      appearance: none;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--text);
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 14px;       /* 統一：14px */
-      cursor: pointer;
-    }
-    .btn:hover { background: #f9fafb; }
-    .btn:active { transform: translateY(1px); }
-
-    .toast {
-      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
-      background: rgba(17,24,39,.92); color: #fff;
-      padding: 10px 14px; border-radius: 10px; font-size: 14px;
-      opacity: 0; transition: opacity .2s ease;
-    }
-    .toast.show { opacity: 1; }
-
-    /* ========= テーブル（PC表示） ========= */
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-    th, td {
-      border-bottom: 1px solid var(--line);
-      padding: 10px 8px;
-      font-size: 15px;
-      vertical-align: top;
-    }
-    th {
-      position: sticky; top: 0;
-      background: var(--thead);
-      z-index: 1;
-      font-weight: 700;
-    }
-    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋「▶前回」＋コピー） */
-    th:nth-child(1), td:nth-child(1) { width: 30%; }
-    th:nth-child(2), td:nth-child(2) { width: 50%; }
-    th:nth-child(3), td:nth-child(3) { width: 20%; }
-
-    /* 操作列の中身を右寄せ・折返し対応 */
-    .ops {
-      display: flex; align-items: center; justify-content: flex-end;
-      gap: 8px; flex-wrap: wrap;
-    }
-
-    /* チップ（C列/D列表示用） */
-    .chip {
-      display: inline-flex; align-items: center;
-      max-width: 100%;
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 14px;         /* コピーと同等に統一 */
-      background: var(--chip-bg);
-      color: var(--chip-text);
-      text-decoration: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      border: 1px solid var(--line);
-    }
-    .chip a { color: inherit; text-decoration: underline; }
-
-    /* D専用（▶前回）— 視覚的にわずかにコンパクト */
-    .chip--d { padding: 2px 6px; }
-
-    /* ========= スマホ：2行カード表示 ========= */
-    @media (max-width: 768px) {
-      table { display: none; }
-      .mobile-list { display: block; margin-top: 10px; }
-      .item {
-        border-bottom: 1px solid var(--line);
-        padding: 12px 2px;
-        display: flex; flex-direction: column; gap: 6px;
-      }
-      .l1 { /* 1行目：アーティスト / 曲名（太字） */
-        font-size: 16px; line-height: 1.6; font-weight: 700;
-        display: flex; gap: 6px; flex-wrap: wrap;
-      }
-      .l1 .sep { opacity: .6; }
-      .l2 { /* 2行目：右端に Cチップ → D小チップ（▶前回） → コピー */
-        display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
-      }
-      .btn { padding: 8px 12px; font-size: 14px; }
-    }
+    :root{ --bg:#ffb744; --card:#fff; --text:#1a1a1a; --muted:#6b7280; --line:#e5e7eb; --thead:#ffe0b5; --focus:#3897c9; --chip-bg:#f3f4f6; --chip-text:#111827; }
+    *{box-sizing:border-box}
+    body{ background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif; line-height:1.7; margin:12px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+    .row{ display:flex; gap:10px; align-items:center; } .row>*{ flex:1; } .row-controls{ margin-top:8px; }
+    input[type="search"],select{ width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:12px; font-size:16px; background:#fff; color:var(--text); outline:none; }
+    input[type="search"]:focus,select:focus,.btn:focus,.chip:focus{ outline:3px solid var(--focus); outline-offset:2px; }
+    #limit{ padding:6px 10px; font-size:14px; line-height:1.2; max-width:160px; }
+    .muted{ color:var(--muted); font-size:13px; }
+    .btn{ appearance:none; border:1px solid var(--line); background:#fff; color:var(--text); border-radius:10px; padding:8px 12px; font-size:14px; cursor:pointer; }
+    .btn:hover{ background:#f9fafb } .btn:active{ transform:translateY(1px) }
+    .toast{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:rgba(17,24,39,.92); color:#fff; padding:10px 14px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .2s; }
+    .toast.show{ opacity:1 }
+    table{ width:100%; border-collapse:collapse; margin-top:10px; table-layout:fixed; }
+    th,td{ border-bottom:1px solid var(--line); padding:10px 8px; font-size:15px; vertical-align:top; }
+    th{ position:sticky; top:0; background:var(--thead); z-index:1; font-weight:700; }
+    th:nth-child(1),td:nth-child(1){ width:30% } th:nth-child(2),td:nth-child(2){ width:50% } th:nth-child(3),td:nth-child(3){ width:20% }
+    .ops{ display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .chip{ display:inline-flex; align-items:center; max-width:100%; padding:4px 8px; border-radius:999px; font-size:14px; background:var(--chip-bg); color:var(--chip-text); text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border:1px solid var(--line); }
+    .chip--d{ padding:2px 6px; }
+    @media (max-width:768px){ table{display:none} .mobile-list{display:block;margin-top:10px} .item{border-bottom:1px solid var(--line); padding:12px 2px; display:flex; flex-direction:column; gap:6px}
+      .l1{ font-size:16px; line-height:1.6; font-weight:700; display:flex; gap:6px; flex-wrap:wrap } .l1 .sep{opacity:.6}
+      .l2{ display:flex; align-items:center; gap:8px; justify-content:flex-end; flex-wrap:wrap } }
   </style>
 </head>
 <body>
-
-  <!-- ===== 検索UI ===== -->
   <div class="card">
-    <div class="row">
-      <input id="q" type="search" placeholder="曲名／アーティスト名で検索（例：群青日和／椎名林檎）" autocomplete="off">
-    </div>
+    <div class="row"><input id="q" type="search" placeholder="曲名／アーティスト名で検索（例：群青日和／椎名林檎）" autocomplete="off"></div>
     <div class="row row-controls">
-      <select id="limit">
-        <option value="50">上限 50件</option>
-        <option value="100">上限 100件</option>
-        <option value="200">上限 200件</option>
-      </select>
+      <select id="limit"><option value="50">上限 50件</option><option value="100">上限 100件</option><option value="200">上限 200件</option></select>
     </div>
     <div class="muted" id="status">読み込み中…</div>
   </div>
 
-  <!-- ===== 結果表示 ===== -->
   <div class="card" style="margin-top:12px;">
     <div class="muted" id="hint">検索結果がここに表示されます。</div>
-    <!-- PC用テーブル -->
     <div id="table"></div>
-    <!-- モバイル用2行リスト -->
     <div id="mblist" class="mobile-list" style="display:none;"></div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite">コピーしました</div>
 
   <script>
-    /* ===== 設定（GASのJSONPエンドポイント） ===== */
     const API_URL = 'https://script.google.com/macros/s/AKfycbye3u5CLItDwsvmk7Ex8ZTtDTm-_KlQ6xGTMtHBwxdI3WUgFOQVIW16F4tPv04dAq8bFg/exec';
-
     const state = { rows: [], debounce: null };
 
-    /* ===== 文字列ユーティリティ ===== */
-    function normalize(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); }
     function $(id){ return document.getElementById(id); }
-
-    function showToast(msg){
-      const t = $('toast'); t.textContent = msg; t.classList.add('show');
-      setTimeout(()=> t.classList.remove('show'), 1400);
-    }
-
+    function normalize(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); }
+    function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1400); }
     async function copyPair(title, artist){
       const text = `${(title||'').trim()} / ${(artist||'').trim()}`.trim();
-      try{
-        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-        else {
-          const ta = document.createElement('textarea');
-          ta.value = text; document.body.appendChild(ta);
-          ta.select(); document.execCommand('copy'); ta.remove();
-        }
+      try{ if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+        else { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
         showToast('コピーしました：' + text);
-      } catch {
-        showToast('コピーに失敗しました');
-      }
+      } catch { showToast('コピーに失敗しました'); }
+    }
+    function linkifyText(text){
+      const frag=document.createDocumentFragment(); if(!text) return frag;
+      const re=/(https?:\/\/[^\s]+)/g; let last=0, m;
+      while((m=re.exec(text))!==null){ if(m.index>last) frag.appendChild(document.createTextNode(text.slice(last,m.index)));
+        const a=document.createElement('a'); a.href=m[1]; a.target='_blank'; a.rel='noopener'; a.textContent=m[1]; frag.appendChild(a); last=re.lastIndex; }
+      if(last<text.length) frag.appendChild(document.createTextNode(text.slice(last))); return frag;
     }
 
-    /* === プレーンテキストURL自動リンク化（Cテキストの保険） === */
-    function linkifyText(text) {
-      const frag = document.createDocumentFragment();
-      if (!text) return frag;
-      const re = /(https?:\/\/[^\s]+)/g;
-      let last = 0; let m;
-      while ((m = re.exec(text)) !== null) {
-        if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
-        const a = document.createElement('a');
-        a.href = m[1]; a.target = '_blank'; a.rel = 'noopener';
-        a.textContent = m[1];
-        frag.appendChild(a);
-        last = re.lastIndex;
-      }
-      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
-      return frag;
-    }
-
-    /* ===== JSONP 受け口（GAS → HTML） ===== */
+    // JSONP受け口
     function onGviz(payload){
       try{
-        // GAS: { rows: [{artist,title,cText,cUrl,dText,dUrl}, ...] }
-        const rows = (payload.rows || []).map(r => [
-          r.artist || '', r.title || '',
-          r.cText || '', r.dText || '',
-          r.cUrl  || '', r.dUrl  || ''
-        ]);
-        // 格納形式: [artist, title, cText, dText, cUrl, dUrl]
+        console.log('GAS payload:', payload);
+        const rows = (payload.rows||[]).map(r=>[ r.artist||'', r.title||'', r.cText||'', r.dText||'', r.cUrl||'', r.dUrl||'' ]);
         state.rows = rows;
         $('status').textContent = `読み込み完了：${rows.length}件`;
         render();
-      } catch (e) {
-        $('status').textContent = '読み込みに失敗しました';
-        console.error(e);
+      } catch(e){
+        console.error(e); $('status').textContent = '読み込みに失敗しました';
       }
     }
-    // JSONP コールバックをグローバルに公開
     window.onGviz = onGviz;
 
-    /* ===== 描画（PC=テーブル／スマホ=2行カード） ===== */
     function render(){
-      const tableWrap = $('table'); tableWrap.innerHTML = '';
-      const listWrap  = $('mblist'); listWrap.innerHTML = '';
-      const hint = $('hint');
+      const tableWrap=$('table'); tableWrap.innerHTML='';
+      const listWrap=$('mblist'); listWrap.innerHTML='';
+      const hint=$('hint');
 
-      const q = normalize($('q').value || '');
-      const limitSelected = parseInt($('limit').value, 10);
-      const limit = Math.min(isFinite(limitSelected) ? limitSelected : 50, 200);
+      const q = normalize($('q').value||'');
+      const limit = Math.min(parseInt($('limit').value,10)||50, 200);
 
       let filtered = state.rows;
       if (q) {
-        // 常に部分一致：アーティスト or 曲名
-        filtered = filtered.filter(([artist, title]) => {
-          const a = normalize(artist), t = normalize(title);
+        filtered = filtered.filter(([artist,title])=>{
+          const a=normalize(artist), t=normalize(title);
           return a.includes(q) || t.includes(q);
         });
       }
@@ -277,133 +105,48 @@
         ? `${rows.length}件ヒット（全${filtered.length}件）／表示上限 ${limit}件`
         : `表示中 ${rows.length}件（全${state.rows.length}件）／表示上限 ${limit}件`;
 
-      if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
-      hint.textContent = '';
+      if (rows.length===0){ hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
+      hint.textContent='';
 
-      /* ==== PC：テーブル（操作列に Cチップ → D小チップ（▶前回） → コピー） ==== */
-      const table = document.createElement('table');
-      const thead = document.createElement('thead');
-      const trh = document.createElement('tr');
-      ['アーティスト名','曲名','操作'].forEach(h=>{
-        const th = document.createElement('th'); th.textContent = h; trh.appendChild(th);
-      });
+      // PCテーブル
+      const table=document.createElement('table');
+      const thead=document.createElement('thead');
+      const trh=document.createElement('tr');
+      ['アーティスト名','曲名','操作'].forEach(h=>{ const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
       thead.appendChild(trh); table.appendChild(thead);
+      const tbody=document.createElement('tbody');
 
-      const tbody = document.createElement('tbody');
-      rows.forEach(([artist, title, cText, dText, cUrl, dUrl])=>{
-        const tr = document.createElement('tr');
+      rows.forEach(([artist,title,cText,dText,cUrl,dUrl])=>{
+        const tr=document.createElement('tr');
+        let td=document.createElement('td'); td.textContent=artist; tr.appendChild(td);
+        td=document.createElement('td'); td.textContent=title; tr.appendChild(td);
 
-        let td = document.createElement('td'); td.textContent = artist; tr.appendChild(td);
-        td = document.createElement('td'); td.textContent = title; tr.appendChild(td);
+        const tdOps=document.createElement('td');
+        const ops=document.createElement('div'); ops.className='ops';
 
-        const tdOps = document.createElement('td');
-        const ops = document.createElement('div'); ops.className = 'ops';
-
-        /* C列のチップ：URLがあれば <a>、無ければテキストを自動リンク化した <span> */
-        if (cText) {
-          if (cUrl) {
-            const a = document.createElement('a');
-            a.href = cUrl; a.target = '_blank'; a.rel = 'noopener';
-            a.className = 'chip'; a.textContent = cText;
-            ops.appendChild(a);
+        // C列チップ
+        if (cText){
+          if (cUrl){
+            const a=document.createElement('a'); a.href=cUrl; a.target='_blank'; a.rel='noopener'; a.className='chip'; a.textContent=cText; ops.appendChild(a);
           } else {
-            const span = document.createElement('span');
-            span.className = 'chip';
-            span.appendChild(linkifyText(cText));
-            ops.appendChild(span);
+            const span=document.createElement('span'); span.className='chip'; span.appendChild(linkifyText(cText)); ops.appendChild(span);
           }
         }
 
-        /* D列の「▶前回」：dUrl があれば a、無ければ span（コピーの左隣） */
-        if (dText || dUrl) {
-          let dEl;
-          if (dUrl) {
-            const a = document.createElement('a');
-            a.href = dUrl; a.target = '_blank'; a.rel = 'noopener';
-            a.className = 'chip chip--d'; a.textContent = '▶前回';
-            dEl = a;
+        // D列「▶前回」：dUrlがあれば a、無ければspan
+        if (dText || dUrl){
+          if (dUrl){
+            const a=document.createElement('a'); a.href=dUrl; a.target='_blank'; a.rel='noopener'; a.className='chip chip--d'; a.textContent='▶前回'; ops.appendChild(a);
           } else {
-            const span = document.createElement('span');
-            span.className = 'chip chip--d'; span.textContent = '▶前回';
-            dEl = span;
+            const span=document.createElement('span'); span.className='chip chip--d'; span.textContent='▶前回'; ops.appendChild(span);
           }
-          ops.appendChild(dEl);
         }
 
-        /* コピー */
-        const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
-        btn.addEventListener('click', ()=> copyPair(title, artist));
+        const btn=document.createElement('button'); btn.className='btn'; btn.textContent='コピー';
+        btn.addEventListener('click', ()=>copyPair(title,artist));
         ops.appendChild(btn);
 
-        tdOps.appendChild(ops);
-        tr.appendChild(tdOps);
+        tdOps.appendChild(ops); tr.appendChild(tdOps);
         tbody.appendChild(tr);
       });
-      table.appendChild(tbody);
-      tableWrap.appendChild(table);
-
-      /* ==== スマホ：2行カード（右端：Cチップ → D小チップ（▶前回） → コピー） ==== */
-      rows.forEach(([artist, title, cText, dText, cUrl, dUrl])=>{
-        const item = document.createElement('div'); item.className = 'item';
-
-        const l1 = document.createElement('div'); l1.className = 'l1';
-        const a1 = document.createElement('span'); a1.className='artist'; a1.textContent = artist;
-        const sep = document.createElement('span'); sep.className='sep'; sep.textContent = '/';
-        const t1 = document.createElement('span'); t1.className='title'; t1.textContent = title;
-        l1.appendChild(a1); l1.appendChild(sep); l1.appendChild(t1);
-
-        const l2 = document.createElement('div'); l2.className = 'l2';
-
-        if (cText) {
-          if (cUrl) {
-            const a = document.createElement('a');
-            a.href = cUrl; a.target = '_blank'; a.rel = 'noopener';
-            a.className = 'chip'; a.textContent = cText;
-            l2.appendChild(a);
-          } else {
-            const span = document.createElement('span');
-            span.className = 'chip';
-            span.appendChild(linkifyText(cText));
-            l2.appendChild(span);
-          }
-        }
-
-        if (dText || dUrl) {
-          if (dUrl) {
-            const a = document.createElement('a');
-            a.href = dUrl; a.target = '_blank'; a.rel = 'noopener';
-            a.className = 'chip chip--d'; a.textContent = '▶前回';
-            l2.appendChild(a);
-          } else {
-            const span = document.createElement('span');
-            span.className = 'chip chip--d'; span.textContent = '▶前回';
-            l2.appendChild(span);
-          }
-        }
-
-        const btn = document.createElement('button'); btn.className='btn'; btn.textContent='コピー';
-        btn.addEventListener('click', ()=> copyPair(title, artist));
-        l2.appendChild(btn);
-
-        item.appendChild(l1); item.appendChild(l2);
-        listWrap.appendChild(item);
-      });
-
-      listWrap.style.display = 'block';
-    }
-
-    /* ===== データ取得開始（JSONPでGASを呼ぶ） ===== */
-    (function load(){
-      const s = document.createElement('script');
-      s.src = API_URL + '?callback=onGviz&v=' + Date.now(); // キャッシュ回避用パラメータ
-      s.onerror = ()=> { $('status').textContent = 'データ取得に失敗しました'; };
-      document.head.appendChild(s);
-    })();
-
-    /* ===== イベント ===== */
-    function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 220); }
-    $('q').addEventListener('input', scheduleSearch);
-    $('limit').addEventListener('change', render);
-  </script>
-</body>
-</html>
+      table.appen
