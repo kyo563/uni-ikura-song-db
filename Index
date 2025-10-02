@@ -53,28 +53,23 @@
 <div id="toast" class="toast">コピーしました</div>
 
 <script>
-  // ===== 設定（差し替え必須） =====
-  const SHEET_ID = 'YOUR_SHEET_ID';               // 例: 1abcDEF... のID
-  const GID = 'GID_OF_MOBILE_VIEW';               // 表示用シート（Mobile_Viewなど）のgid
-  const MAX_FETCH_ROWS = 5000;                    // 取得上限（必要に応じて）
+  // ===== 設定（SHEET_IDは反映済み。GIDは仮の 0。必要に応じて差し替え） =====
+  const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
+  const GID = '0'; // ← 表示したいタブを開いたURLの gid= の数字に置き換えてください
+  const MAX_FETCH_ROWS = 5000;
 
-  // gviz JSONP エンドポイント（Cookie不要・ITP非依存）
   function buildGvizUrl() {
-    // 列は A,B,C,D を想定（アーティスト/曲名/備考/直リンク）
+    // 列は A,B,C,D（アーティスト/曲名/備考/直リンク）を想定
     const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
-    // responseHandler=onGviz は JSONP コールバック名
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
   }
 
-  // 状態
   const state = { rows: [], debounce: null };
 
-  // JSONP 受け取り
   function onGviz(resp) {
     try {
       const table = resp.table;
       const rows = (table.rows || []).map(r => {
-        // gvizは null の場合あり
         const a = (r.c[0] && r.c[0].v) || ''; // アーティスト
         const t = (r.c[1] && r.c[1].v) || ''; // 曲名
         const n = (r.c[2] && r.c[2].v) || ''; // 備考
@@ -89,19 +84,13 @@
       console.error(e);
     }
   }
-  window.onGviz = onGviz; // JSONP コールバック公開
+  window.onGviz = onGviz;
 
-  // 検索
   function normalize(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); }
-  function scheduleSearch(){
-    clearTimeout(state.debounce);
-    state.debounce = setTimeout(render, 200);
-  }
+  function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 200); }
 
-  // テーブル描画
   function render(){
-    const container = $('table');
-    container.innerHTML = '';
+    const container = $('table'); container.innerHTML = '';
     const hint = $('hint');
 
     const q = normalize($('q').value || '');
@@ -112,21 +101,16 @@
     if (q) {
       filtered = filtered.filter(([artist, title]) => {
         const a = normalize(artist), t = normalize(title);
-        if (mode === 'prefix') return a.startsWith(q) || t.startsWith(q);
-        return a.includes(q) || t.includes(q);
+        return mode === 'prefix' ? (a.startsWith(q) || t.startsWith(q)) : (a.includes(q) || t.includes(q));
       });
     }
     const rows = filtered.slice(0, limit);
 
     $('status').textContent = q ? `${rows.length}件ヒット（全${filtered.length}件）` : `表示中 ${rows.length}件（全${state.rows.length}件）`;
-    if (rows.length === 0) {
-      hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。';
-      return;
-    }
+    if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
     hint.textContent = '';
 
     const table = document.createElement('table');
-
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     ['アーティスト名','曲名','備考','歌枠直リンク','コピー'].forEach(h=>{
@@ -150,9 +134,7 @@
       tr.appendChild(td);
 
       const tdOp = document.createElement('td');
-      const btn = document.createElement('button');
-      btn.className = 'btn';
-      btn.textContent = 'コピー';
+      const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
       btn.addEventListener('click', ()=> copyPair(title, artist));
       tdOp.appendChild(btn); tr.appendChild(tdOp);
 
@@ -165,27 +147,15 @@
   async function copyPair(title, artist){
     const text = `${(title||'').trim()} / ${(artist||'').trim()}`.trim();
     try{
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = text; document.body.appendChild(ta);
-        ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-      }
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
       showToast('コピーしました：' + text);
-    } catch {
-      showToast('コピーに失敗しました');
-    }
+    } catch { showToast('コピーに失敗しました'); }
   }
 
-  function showToast(msg){
-    const t = $('toast'); t.textContent = msg; t.classList.add('show');
-    setTimeout(()=> t.classList.remove('show'), 1200);
-  }
-
+  function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); }
   function $(id){ return document.getElementById(id); }
 
-  // JSONP読み込み開始
   (function load(){
     const s = document.createElement('script');
     s.src = buildGvizUrl();
@@ -193,7 +163,6 @@
     document.head.appendChild(s);
   })();
 
-  // UIハンドラ
   $('q').addEventListener('input', scheduleSearch);
   $('limit').addEventListener('change', render);
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', render));
