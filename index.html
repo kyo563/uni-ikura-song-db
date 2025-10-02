@@ -15,7 +15,7 @@
       --muted: #6b7280;   /* 補助文字 */
       --line: #e5e7eb;    /* 罫線 */
       --thead: #ffe0b5;   /* テーブル見出し背景 */
-      --focus: #3897c9;   /* フォーカスリング */
+      --focus: #3897c9;   /* フォーカスリング（ご指定色） */
       --chip-bg: #f3f4f6; /* チップ背景 */
       --chip-text: #111827; /* チップ文字 */
     }
@@ -80,7 +80,7 @@
       color: var(--text);
       border-radius: 10px;
       padding: 8px 12px;
-      font-size: 14px;
+      font-size: 14px;       /* 14px */
       cursor: pointer;
     }
     .btn:hover { background: #f9fafb; }
@@ -108,7 +108,7 @@
       z-index: 1;
       font-weight: 700;
     }
-    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋Dチップ（▶前回）＋▶＋コピー） */
+    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋D小チップ（▶前回）＋▶＋コピー） */
     th:nth-child(1), td:nth-child(1) { width: 30%; }
     th:nth-child(2), td:nth-child(2) { width: 50%; }
     th:nth-child(3), td:nth-child(3) { width: 20%; }
@@ -134,7 +134,7 @@
       max-width: 100%;
       padding: 4px 8px;
       border-radius: 999px;
-      font-size: 13px;
+      font-size: 14px;         /* 統一：14px（コピーと同等） */
       background: var(--chip-bg);
       color: var(--chip-text);
       text-decoration: none;
@@ -145,11 +145,8 @@
     }
     .chip a { color: inherit; text-decoration: underline; }
 
-    /* D列専用の小チップ（▶前回）— フォント8pt・コンパクト */
-    .chip--d {
-      font-size: 8pt;         /* ご指定 */
-      padding: 2px 6px;
-    }
+    /* D列専用の小チップ（▶前回）— 表示ラベルのみ変更、サイズは .chip に準拠 */
+    .chip--d { padding: 2px 6px; } /* 視覚的にややコンパクト */
 
     /* ========= スマホ：2行カード表示 ========= */
     @media (max-width: 768px) {
@@ -165,7 +162,7 @@
         display: flex; gap: 6px; flex-wrap: wrap;
       }
       .l1 .sep { opacity: .6; }
-      .l2 { /* 2行目：右端に Cチップ → Dチップ（▶前回） → ▶ → コピー */
+      .l2 { /* 2行目：右端に Cチップ → ▶ → D小チップ（▶前回） → コピー */
         display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
       }
       .btn { padding: 8px 12px; font-size: 14px; }
@@ -215,21 +212,28 @@
 
     const state = { rows: [], debounce: null };
 
+    /* === UIリンク（cell.p）を試行的に抽出（gvizが返せば拾える） === */
+    function extractUiLinkFromProps(cell){
+      if (!cell || !cell.p || typeof cell.p !== 'object') return '';
+      const p = cell.p;
+      if (typeof p.hyperlink === 'string') return p.hyperlink.trim();
+      if (typeof p.link === 'string') return p.link.trim();
+      if (p.link && typeof p.link.url === 'string') return p.link.url.trim();
+      if (p.hyperlink && typeof p.hyperlink.url === 'string') return p.hyperlink.url.trim();
+      for (const k of Object.keys(p)) {
+        const v = p[k];
+        if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v.trim();
+        if (v && typeof v.url === 'string' && /^https?:\/\//i.test(v.url)) return v.url.trim();
+      }
+      return '';
+    }
+
     /* === D列の主URL抽出：UIリンク > HYPERLINK関数 > 生URL === */
     function extractUrl(cell) {
       if (!cell) return '';
-      // properties（UIで付与されたリンク）
-      if (cell.p && typeof cell.p === 'object') {
-        if (typeof cell.p.hyperlink === 'string') return cell.p.hyperlink.trim();
-        if (typeof cell.p.link === 'string') return cell.p.link.trim();
-        if (cell.p.link && typeof cell.p.link.url === 'string') return cell.p.link.url.trim();
-        if (cell.p.hyperlink && typeof cell.p.hyperlink.url === 'string') return cell.p.hyperlink.url.trim();
-        for (const k of Object.keys(cell.p)) {
-          const v = cell.p[k];
-          if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v.trim();
-          if (v && typeof v.url === 'string' && /^https?:\/\//i.test(v.url)) return v.url.trim();
-        }
-      }
+      const viaProps = extractUiLinkFromProps(cell);
+      if (viaProps) return viaProps;
+
       // 数式（HYPERLINK / aタグ）
       if (typeof cell.f === 'string') {
         let m = cell.f.match(/HYPERLINK\(\s*"([^"]+)"/i);
@@ -242,25 +246,26 @@
         if (m) return m[1].trim();
       }
       // 生URL
-      if (typeof cell.v === 'string' && /^https?:\/\//i.test(cell.v)) {
-        return cell.v.trim();
-      }
+      if (typeof cell.v === 'string' && /^https?:\/\//i.test(cell.v)) return cell.v.trim();
       return '';
     }
 
     /* === セル内アンカー（HYPERLINK/HTML）の抽出 === */
     function extractAnchors(cell) {
       const out = [];
-      if (!cell || typeof cell.f !== 'string') return out;
-      const f = cell.f;
+      if (!cell) return out;
 
+      // 1) UIリンク（cell.p）を1件だけでも拾う（テキストは cell.v を使う）
+      const hrefP = extractUiLinkFromProps(cell);
+      if (hrefP) out.push({ href: hrefP, text: (typeof cell.v === 'string' ? cell.v : hrefP) });
+
+      // 2) 数式内の HYPERLINK / aタグ
+      const f = typeof cell.f === 'string' ? cell.f : '';
       let m;
       const re1 = /HYPERLINK\(\s*"([^"]+)"\s*,\s*"([^"]*)"\s*\)/ig;
       while ((m = re1.exec(f)) !== null) out.push({ href: m[1], text: m[2] || m[1] });
-
       const re2 = /HYPERLINK\(\s*'([^']+)'\s*,\s*'([^']*)'\s*\)/ig;
       while ((m = re2.exec(f)) !== null) out.push({ href: m[1], text: m[2] || m[1] });
-
       const re3 = /<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/ig;
       while ((m = re3.exec(f)) !== null) out.push({ href: m[1], text: stripHtml(m[2]) || m[1] });
 
@@ -338,7 +343,7 @@
       }
     }
 
-    /* === Cセルのチップ生成（リンク維持 or 自動リンク化） === */
+    /* === Cセルのチップ生成（リッチテキスト／UIリンク／自動リンク化に対応） === */
     function buildChipsFromC(cell) {
       const chips = [];
       if (!cell) return chips;
@@ -363,7 +368,7 @@
       return chips;
     }
 
-    /* === Dセルの「▶前回」小チップ生成（リンクあれば a、無ければ span） === */
+    /* === Dセルの「▶前回」小チップ生成（コピー左隣、リンクがあれば a 要素） === */
     function buildChipFromD(cell) {
       if (!cell) return null;
 
@@ -372,7 +377,6 @@
       const urlFromAnchors = anchors.length > 0 ? anchors[0].href : '';
       const url = urlFromAnchors || extractUrl(cell);
 
-      // D列に何かしら文字列 or アンカーが存在する場合のみ作成
       if (!hasText && !anchors.length && !url) return null;
 
       let el;
@@ -399,7 +403,7 @@
 
       const q = normalize($('q').value || '');
       const limitSelected = parseInt($('limit').value, 10);
-      const limit = Math.min(isFinite(limitSelected) ? limitSelected : 50, 200);
+      const limit = Math.min(isFinite(limitSelected) ? limitSelected : 50, HARD_LIMIT);
 
       let filtered = state.rows;
       if (q) {
@@ -418,7 +422,7 @@
       if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
       hint.textContent = '';
 
-      /* ==== PC：テーブル（操作列に Cチップ → D小チップ（▶前回） → ▶ → コピー） ==== */
+      /* ==== PC：テーブル（操作列に Cチップ → ▶ → D小チップ（▶前回） → コピー） ==== */
       const table = document.createElement('table');
       const thead = document.createElement('thead');
       const trh = document.createElement('tr');
@@ -434,15 +438,11 @@
         let td = document.createElement('td'); td.textContent = artist || ''; tr.appendChild(td);
         td = document.createElement('td'); td.textContent = title || ''; tr.appendChild(td);
 
-        // 操作列
         const tdOps = document.createElement('td');
         const ops = document.createElement('div'); ops.className = 'ops';
 
         // C列チップ
         buildChipsFromC(noteCell).forEach(el => ops.appendChild(el));
-
-        // D列「▶前回」小チップ（コピーの左隣に置くので、順番のため一旦記録）
-        const dChip = buildChipFromD(linkCell);
 
         // ▶（D主URL）
         if (url) {
@@ -453,7 +453,8 @@
           ops.appendChild(a);
         }
 
-        // 「▶前回」小チップをコピーの直前に配置
+        // D小チップ（▶前回）— コピーの直前に配置
+        const dChip = buildChipFromD(linkCell);
         if (dChip) ops.appendChild(dChip);
 
         // コピー
@@ -480,10 +481,8 @@
 
         const l2 = document.createElement('div'); l2.className = 'l2';
 
-        // C列チップ
         buildChipsFromC(noteCell).forEach(el => l2.appendChild(el));
 
-        // ▶（主URL）
         if (url) {
           const a = document.createElement('a');
           a.href = url; a.target = '_blank'; a.rel = 'noopener';
@@ -492,11 +491,9 @@
           l2.appendChild(a);
         }
 
-        // D小チップ（▶前回）— コピーの左隣
-        const dChip = buildChipFromD(linkCell);
+        const dChip = buildChipFromD(linkCell);  // コピーの左隣
         if (dChip) l2.appendChild(dChip);
 
-        // コピー
         const btn = document.createElement('button'); btn.className='btn'; btn.textContent='コピー';
         btn.addEventListener('click', ()=> copyPair(title, artist));
         l2.appendChild(btn);
