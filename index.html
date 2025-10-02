@@ -23,14 +23,13 @@
   .toast { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:rgba(0,0,0,.8); color:#fff; padding:8px 12px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .2s; }
   .toast.show { opacity:1; }
 
-  /* ▶ アイコン（歌枠直リンク）の見た目とタップしやすさ */
   .link-icon {
     display:inline-flex; align-items:center; justify-content:center;
     width:36px; height:36px; line-height:1; text-decoration:none; font-size:18px;
   }
   .link-icon:active { transform: translateY(1px); }
 
-  /* ===== スマホ：2行カード表示 ===== */
+  /* スマホ：2行カード表示 */
   @media (max-width: 768px) {
     table { display:none; }
     .mobile-list { display:block; margin-top:8px; }
@@ -38,20 +37,16 @@
       border-bottom:1px solid #eee; padding:10px 6px;
       display:flex; flex-direction:column; gap:6px;
     }
-    .l1 { /* 1行目：アーティスト / 曲名（太字） */
-      font-size:15px; line-height:1.5; font-weight:600; display:flex; gap:6px; flex-wrap:wrap;
-    }
+    .l1 { font-size:15px; line-height:1.5; font-weight:600; display:flex; gap:6px; flex-wrap:wrap; }
     .l1 .sep { opacity:.6; }
-    .l2 { /* 2行目：右端に ▶ と コピー */
-      display:flex; align-items:center; gap:8px; justify-content:flex-end;
-    }
+    .l2 { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
     .btn { padding:6px 10px; font-size:13px; }
   }
 
-  /* ===== PC：テーブル（備考列なし） ===== */
+  /* PC：テーブル（備考なし） */
   @media (min-width: 769px) {
     table { table-layout: fixed; }
-    /* 列配分：1=アーティスト 2=曲名 3=リンク 4=コピー */
+    /* 1=アーティスト 2=曲名 3=リンク 4=コピー */
     th:nth-child(1), td:nth-child(1) { width: 30%; }
     th:nth-child(2), td:nth-child(2) { width: 60%; }
     th:nth-child(3), td:nth-child(3) {
@@ -83,56 +78,85 @@
 
 <div class="card" style="margin-top:12px;">
   <div class="muted" id="hint">検索結果がここに表示されます。</div>
-  <!-- PC用テーブル -->
   <div id="table"></div>
-  <!-- モバイル用2行リスト -->
   <div id="mblist" class="mobile-list" style="display:none;"></div>
 </div>
 
 <div id="toast" class="toast">コピーしました</div>
 
 <script>
-  // ===== 設定 =====
+  /* ===== 設定 ===== */
   const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
-  const GID = '0'; // ← 表示したいタブの gid
+  const GID = '0';              // 表示タブの gid
   const MAX_FETCH_ROWS = 5000;
 
   function buildGvizUrl() {
-    // A:アーティスト B:曲名 C:備考 D:直リンク
     const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
   }
 
   const state = { rows: [], debounce: null };
 
-  // D列のセルからURLを抽出（HYPERLINKの書式対応）
+  /* === D列のURLを最大限取りこぼさない抽出関数 === */
   function extractUrl(cell) {
-    // cell.f に <a href="..."> が入っていることがある
-    if (cell && typeof cell.f === 'string') {
-      const m = cell.f.match(/href="([^"]+)"/i);
-      if (m) return m[1];
+    if (!cell) return '';
+
+    // 0) プロパティ経由（UIの「リンクを挿入」で付いたリンク）
+    if (cell.p && typeof cell.p === 'object') {
+      if (typeof cell.p.hyperlink === 'string') return cell.p.hyperlink.trim();
+      if (typeof cell.p.link === 'string') return cell.p.link.trim();
+      if (cell.p.link && typeof cell.p.link.url === 'string') return cell.p.link.url.trim();
+      if (cell.p.hyperlink && typeof cell.p.hyperlink.url === 'string') return cell.p.hyperlink.url.trim();
+      // 稀に { "link": "https://..." } や { "hyperlink": "https://..." } のケースがある
+      if (cell.p['hyperlink']) {
+        const hv = cell.p['hyperlink'];
+        if (typeof hv === 'string') return hv.trim();
+        if (hv && typeof hv.url === 'string') return hv.url.trim();
+      }
+      if (cell.p['link']) {
+        const lv = cell.p['link'];
+        if (typeof lv === 'string') return lv.trim();
+        if (lv && typeof lv.url === 'string') return lv.url.trim();
+      }
     }
-    // v がURLそのもののケース
-    const v = cell && cell.v;
-    if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v;
+
+    // 1) HYPERLINK() 形式の式（例: HYPERLINK("URL","表示名")）
+    if (typeof cell.f === 'string') {
+      let m = cell.f.match(/HYPERLINK\(\s*"([^"]+)"/i);
+      if (m) return m[1].trim();
+      m = cell.f.match(/HYPERLINK\(\s*'([^']+)'/i);
+      if (m) return m[1].trim();
+      // <a href="...">〜 や JSONエスケープ \" にも対応
+      m = cell.f.match(/href="([^"]+)"/i) || cell.f.match(/href=\\"([^\\"]+)\\"/i);
+      if (m) return m[1].trim();
+      // &quot; でエスケープされたケース
+      m = cell.f.match(/HYPERLINK\(&quot;([^&]+)&quot;/i);
+      if (m) return m[1].trim();
+    }
+
+    // 2) 生URLが値に入っている
+    if (typeof cell.v === 'string' && /^https?:\/\//i.test(cell.v)) {
+      return cell.v.trim();
+    }
+
     return '';
   }
 
-  // JSONP コールバック
+  /* JSONP コールバック */
   function onGviz(resp) {
     try {
       const table = resp.table;
       const raw = (table.rows || []).map(r => {
-        const artist = (r.c && r.c[0] && r.c[0].v) || '';
-        const title  = (r.c && r.c[1] && r.c[1].v) || '';
-        const url    = extractUrl(r.c && r.c[3] ? r.c[3] : null); // ★ D列のURLを厳密抽出
+        const c = r.c || [];
+        const artist = (c[0] && c[0].v) || '';
+        const title  = (c[1] && c[1].v) || '';
+        const url    = extractUrl(c[3] || null);  // ★ D列から厳密抽出
         return [artist, title, url];
       });
 
       // 先頭3行スキップ & A/Bどちらかに文字がある行のみ
       const rows = raw.slice(3).filter(([a, b]) => ((a || '') + (b || '')).trim() !== '');
-
-      state.rows = rows; // [artist, title, url]
+      state.rows = rows;
       $('status').textContent = `読み込み完了：${rows.length}件`;
       render();
     } catch (e) {
@@ -142,11 +166,11 @@
   }
   window.onGviz = onGviz;
 
-  // 正規化
+  /* 共通ユーティリティ */
   function normalize(s){ return (s||'').toString().toLowerCase().replace(/\s+/g,' ').trim(); }
   function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 200); }
 
-  // 描画（PC=テーブル／スマホ=2行カード）
+  /* 描画（PC=テーブル／スマホ=2行カード） */
   function render(){
     const tableWrap = $('table'); tableWrap.innerHTML = '';
     const listWrap  = $('mblist'); listWrap.innerHTML = '';
@@ -169,7 +193,7 @@
     if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
     hint.textContent = '';
 
-    /* ==== PC：テーブル ==== */
+    /* PC：テーブル */
     const table = document.createElement('table');
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
@@ -185,7 +209,6 @@
       let td = document.createElement('td'); td.textContent = artist || ''; tr.appendChild(td);
       td = document.createElement('td'); td.textContent = title || ''; tr.appendChild(td);
 
-      // 歌枠直リンク（▶）
       td = document.createElement('td');
       if (url) {
         const a = document.createElement('a');
@@ -196,7 +219,6 @@
       } else { td.textContent = ''; }
       tr.appendChild(td);
 
-      // コピー列（「曲名 / アーティスト名」）
       const tdOp = document.createElement('td');
       const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
       btn.addEventListener('click', ()=> copyPair(title, artist));
@@ -207,23 +229,19 @@
     table.appendChild(tbody);
     tableWrap.appendChild(table);
 
-    /* ==== スマホ：2行カード ==== */
+    /* スマホ：2行カード（2行目 右端に ▶ → コピー） */
     rows.forEach(([artist, title, url])=>{
-      const item = document.createElement('div');
-      item.className = 'item';
+      const item = document.createElement('div'); item.className = 'item';
 
-      const l1 = document.createElement('div');
-      l1.className = 'l1';
+      const l1 = document.createElement('div'); l1.className = 'l1';
       const a1 = document.createElement('span'); a1.className='artist'; a1.textContent = artist || '';
       const sep = document.createElement('span'); sep.className='sep'; sep.textContent = '/';
       const t1 = document.createElement('span'); t1.className='title'; t1.textContent = title || '';
       l1.appendChild(a1); l1.appendChild(sep); l1.appendChild(t1);
 
-      const l2 = document.createElement('div');
-      l2.className = 'l2';
+      const l2 = document.createElement('div'); l2.className = 'l2';
       const ops = document.createElement('div'); ops.className='ops';
 
-      // 右端に「▶」→「コピー」の順で配置
       if (url) {
         const a = document.createElement('a');
         a.href = url; a.target = '_blank'; a.rel = 'noopener';
@@ -255,7 +273,6 @@
   function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); }
   function $(id){ return document.getElementById(id); }
 
-  // JSONP 取得開始
   (function load(){
     const s = document.createElement('script');
     s.src = buildGvizUrl();
@@ -263,7 +280,6 @@
     document.head.appendChild(s);
   })();
 
-  // イベント
   $('q').addEventListener('input', scheduleSearch);
   $('limit').addEventListener('change', render);
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', render));
