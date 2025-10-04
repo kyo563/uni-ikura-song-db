@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
   <meta name="theme-color" content="#ffb744">
-  <title>雲丹ゐくら歌唱曲DB</title>
+  <title>雲丹ゐくら歌唱曲DB</title> 
 
   <style>
     /* ========= ベーススタイル（可読性重視） ========= */
@@ -39,7 +39,7 @@
 
     .row { display: flex; gap: 10px; align-items: center; }
     .row > * { flex: 1; }
-    .row-controls { margin-top: 8px; }
+    .row-controls { margin-top: 8px; } /* 検索と上限の間に少し余白 */
 
     input[type="search"], select {
       width: 100%;
@@ -54,14 +54,21 @@
     input[type="search"]:focus,
     select:focus,
     .btn:focus,
-    .chip:focus,
     .link-icon:focus {
       outline: 3px solid var(--focus);
       outline-offset: 2px;
     }
 
-    #limit { padding: 6px 10px; font-size: 14px; line-height: 1.2; max-width: 160px; }
-    @supports (-webkit-touch-callout: none) { #limit { padding-top: 5px; padding-bottom: 5px; } }
+    /* 上限セレクトをややコンパクトに */
+    #limit {
+      padding: 6px 10px;
+      font-size: 14px;
+      line-height: 1.2;
+      max-width: 160px;
+    }
+    @supports (-webkit-touch-callout: none) {
+      #limit { padding-top: 5px; padding-bottom: 5px; }
+    }
 
     .muted { color: var(--muted); font-size: 13px; }
 
@@ -72,36 +79,50 @@
       color: var(--text);
       border-radius: 10px;
       padding: 8px 12px;
-      font-size: 14px;
+      font-size: 14px;       /* 14px */
       cursor: pointer;
     }
     .btn:hover { background: #f9fafb; }
     .btn:active { transform: translateY(1px); }
 
-    .toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: rgba(17,24,39,.92); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s ease; }
+    .toast {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+      background: rgba(17,24,39,.92); color: #fff;
+      padding: 10px 14px; border-radius: 10px; font-size: 14px;
+      opacity: 0; transition: opacity .2s ease;
+    }
     .toast.show { opacity: 1; }
 
     /* ========= テーブル（PC表示） ========= */
     table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-    th, td { border-bottom: 1px solid var(--line); padding: 10px 8px; font-size: 15px; vertical-align: top; }
-    th { position: sticky; top: 0; background: var(--thead); z-index: 1; font-weight: 700; }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 8px;
+      font-size: 15px;
+      vertical-align: top;
+    }
+    th {
+      position: sticky; top: 0;
+      background: var(--thead);
+      z-index: 1;
+      font-weight: 700;
+    }
+    /* 列配分：1=アーティスト 2=曲名 3=操作（Cリンク＋Dリンク（▶）＋コピー） */
     th:nth-child(1), td:nth-child(1) { width: 30%; }
     th:nth-child(2), td:nth-child(2) { width: 50%; }
     th:nth-child(3), td:nth-child(3) { width: 20%; }
 
-    .ops { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-
-    .chip {
-      display: inline-flex; align-items: center;
-      max-width: 100%; padding: 4px 8px;
-      border-radius: 999px; font-size: 14px;
-      background: var(--chip-bg); color: var(--chip-text);
-      text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      border: 1px solid var(--line);
+    .ops {
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 8px; flex-wrap: wrap;
     }
 
-    /* リンク用のアイコン（参考コードのUIを取り込み） */
-    .link-icon{ display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; line-height:1; text-decoration:none; font-size:18px; border-radius:8px; color:#111827; }
+    /* リンク用のアイコン */
+    .link-icon{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:36px; height:36px; line-height:1; text-decoration:none; font-size:18px;
+      border-radius:8px; color:#111827;
+    }
     .link-icon:hover{ background:#f3f4f6; }
     .link-icon:active{ transform:translateY(1px); }
 
@@ -109,10 +130,19 @@
     @media (max-width: 768px) {
       table { display: none; }
       .mobile-list { display: block; margin-top: 10px; }
-      .item { border-bottom: 1px solid var(--line); padding: 12px 2px; display: flex; flex-direction: column; gap: 6px; }
-      .l1 { font-size: 16px; line-height: 1.6; font-weight: 700; display: flex; gap: 6px; flex-wrap: wrap; }
+      .item {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 2px;
+        display: flex; flex-direction: column; gap: 6px;
+      }
+      .l1 { /* 1行目：アーティスト / 曲名（太字） */
+        font-size: 16px; line-height: 1.6; font-weight: 700;
+        display: flex; gap: 6px; flex-wrap: wrap;
+      }
       .l1 .sep { opacity: .6; }
-      .l2 { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+      .l2 { /* 2行目：右端に Cリンク → Dリンク（▶） → コピー */
+        display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
+      }
       .btn { padding: 8px 12px; font-size: 14px; }
     }
   </style>
@@ -147,36 +177,35 @@
 
   <script>
     /* ===== 設定 ===== */
-    // Performance Record シートを直接参照（A:アーティスト, B:曲名, C:文字列, D:文字列）
-    const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
-    const GID = '0';                  // Performance Record の gid に差し替え可能
-    const MAX_FETCH_ROWS = 5000;
-    const HARD_LIMIT = 200;           // 内部上限（最大200件）
+    // GAS JSONP API（新デプロイID）
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyEf2jDL40t1j2KgAwhwehw2RVTDQq_aYYtfbFWYXcSBL__TgNSn3G9gK_L4BFDLVVDng/exec';
 
-    function buildGvizUrl() {
-      const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
-      return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
-    }
+    // クライアント側の内部上限
+    const HARD_LIMIT = 200;
 
     const state = { rows: [], debounce: null };
 
-    /* ===== gviz JSONP コールバック ===== */
-    function onGviz(resp) {
+    /* ===== JSONP コールバック ===== */
+    function onGviz(payload) {
       try {
-        const table = resp.table;
-        const raw = (table.rows || []).map(r => {
-          const c = r.c || [];
-          const artist = (c[0] && c[0].v) || '';
-          const title  = (c[1] && c[1].v) || '';
-          const cText  = (c[2] && c[2].v) || '';
-          const dText  = (c[3] && c[3].v) || '';
-          return [artist, title, cText, dText];
-        });
+        if (!payload || !payload.ok || !Array.isArray(payload.rows)) {
+          $('status').textContent = 'データ取得に失敗しました（不正なレスポンス）';
+          return;
+        }
+        // rows: { artist, title, cText, cUrl, dText, dUrl }
+        const rows = payload.rows
+          .map(r => [
+            r.artist || '',
+            r.title  || '',
+            r.cText  || '',
+            r.dText  || '',
+            r.cUrl   || '',
+            r.dUrl   || ''
+          ])
+          // A/Bどちらかが完全空欄は除外
+          .filter(([a,b]) => ((a||'')+(b||'')).trim() !== '');
 
-        // 先頭3行スキップ & A/Bどちらかに文字がある行のみ
-        const rows = raw.slice(3).filter(([a, b]) => ((a || '') + (b || '')).trim() !== '');
-
-        state.rows = rows; // [artist, title, cText, dText]
+        state.rows = rows; // [artist, title, cText, dText, cUrl, dUrl]
         $('status').textContent = `読み込み完了：${rows.length}件`;
         render();
       } catch (e) {
@@ -191,7 +220,10 @@
     function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 220); }
     function $(id){ return document.getElementById(id); }
 
-    function showToast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1400); }
+    function showToast(msg){
+      const t = $('toast'); t.textContent = msg; t.classList.add('show');
+      setTimeout(()=> t.classList.remove('show'), 1400);
+    }
 
     async function copyPair(title, artist){
       const text = `${(title||'').trim()} / ${(artist||'').trim()}`.trim();
@@ -203,10 +235,12 @@
           ta.select(); document.execCommand('copy'); ta.remove();
         }
         showToast('コピーしました：' + text);
-      } catch { showToast('コピーに失敗しました'); }
+      } catch {
+        showToast('コピーに失敗しました');
+      }
     }
 
-    // 文字列から最初のURLを抽出
+    // 文字列から最初のURLを抽出（API側で抽出済みでも保険として使用）
     function urlFromText(s){ if(!s) return ''; const m = String(s).match(/https?:\/\/\S+/); return m ? m[0].replace(/[)\]\s]+$/, '') : ''; }
 
     /* ===== 描画（PC=テーブル／スマホ=2行カード） ===== */
@@ -221,7 +255,10 @@
 
       let filtered = state.rows;
       if (q) {
-        filtered = filtered.filter(([artist, title]) => normalize(artist).includes(q) || normalize(title).includes(q));
+        filtered = filtered.filter(([artist, title]) => {
+          const a = normalize(artist), t = normalize(title);
+          return a.includes(q) || t.includes(q);
+        });
       }
       const rows = filtered.slice(0, limit);
 
@@ -240,7 +277,7 @@
       thead.appendChild(trh); table.appendChild(thead);
 
       const tbody = document.createElement('tbody');
-      rows.forEach(([artist, title, cText, dText])=>{
+      rows.forEach(([artist, title, cText, dText, cUrl, dUrl])=>{
         const tr = document.createElement('tr');
 
         let td = document.createElement('td'); td.textContent = artist || ''; tr.appendChild(td);
@@ -249,17 +286,21 @@
         const tdOps = document.createElement('td');
         const ops = document.createElement('div'); ops.className = 'ops';
 
-        // C列：文字列からURL抽出→リンクアイコン
-        const cUrl = urlFromText(cText);
-        if (cUrl) {
-          const a = document.createElement('a'); a.href = cUrl; a.target = '_blank'; a.rel='noopener'; a.className='link-icon'; a.title='C列リンクを開く'; a.textContent='C';
+        // C列リンク（APIの cUrl 優先、無ければ cText から抽出）
+        const cHref = cUrl || urlFromText(cText);
+        if (cHref) {
+          const a = document.createElement('a');
+          a.href = cHref; a.target = '_blank'; a.rel='noopener';
+          a.className='link-icon'; a.title='C列リンクを開く'; a.textContent='C';
           ops.appendChild(a);
         }
 
-        // D列：文字列からURL抽出→▶アイコン（仕様変更）
-        const dUrl = urlFromText(dText);
-        if (dUrl) {
-          const a = document.createElement('a'); a.href = dUrl; a.target = '_blank'; a.rel='noopener'; a.className='link-icon'; a.title='D列リンクを開く'; a.textContent='▶';
+        // D列リンク（APIの dUrl 優先、無ければ dText から抽出）
+        const dHref = dUrl || urlFromText(dText);
+        if (dHref) {
+          const a = document.createElement('a');
+          a.href = dHref; a.target = '_blank'; a.rel='noopener';
+          a.className='link-icon'; a.title='D列リンクを開く'; a.textContent='▶';
           ops.appendChild(a);
         }
 
@@ -276,7 +317,7 @@
       tableWrap.appendChild(table);
 
       /* ==== スマホ：2行カード（右端：Cリンク → Dリンク（▶） → コピー） ==== */
-      rows.forEach(([artist, title, cText, dText])=>{
+      rows.forEach(([artist, title, cText, dText, cUrl, dUrl])=>{
         const item = document.createElement('div'); item.className = 'item';
 
         const l1 = document.createElement('div'); l1.className = 'l1';
@@ -287,28 +328,38 @@
 
         const l2 = document.createElement('div'); l2.className = 'l2';
 
-        const cUrl = urlFromText(cText);
-        if (cUrl) { const a=document.createElement('a'); a.href=cUrl; a.target='_blank'; a.rel='noopener'; a.className='link-icon'; a.textContent='C'; a.title='C列リンクを開く'; l2.appendChild(a); }
+        const cHref = cUrl || urlFromText(cText);
+        if (cHref) {
+          const a=document.createElement('a'); a.href=cHref; a.target='_blank'; a.rel='noopener';
+          a.className='link-icon'; a.textContent='C'; a.title='C列リンクを開く';
+          l2.appendChild(a);
+        }
 
-        const dUrl = urlFromText(dText);
-        if (dUrl) { const a=document.createElement('a'); a.href=dUrl; a.target='_blank'; a.rel='noopener'; a.className='link-icon'; a.textContent='▶'; a.title='D列リンクを開く'; l2.appendChild(a); }
+        const dHref = dUrl || urlFromText(dText);
+        if (dHref) {
+          const a=document.createElement('a'); a.href=dHref; a.target='_blank'; a.rel='noopener';
+          a.className='link-icon'; a.textContent='▶'; a.title='D列リンクを開く';
+          l2.appendChild(a);
+        }
 
         const btn = document.createElement('button'); btn.className='btn'; btn.textContent='コピー';
         btn.addEventListener('click', ()=> copyPair(title, artist));
         l2.appendChild(btn);
 
         item.appendChild(l1); item.appendChild(l2);
-        listWrap.appendChild(item);
+        $('mblist').appendChild(item);
       });
 
-      listWrap.style.display = 'block';
+      $('mblist').style.display = 'block';
     }
 
-    /* ===== データ取得開始（gviz JSONP） ===== */
+    /* ===== データ取得開始（JSONP） ===== */
     (function load(){
       const s = document.createElement('script');
-      s.src = buildGvizUrl();
-      s.onerror = ()=> { $('status').textContent = 'データ取得に失敗しました'; };
+      // サーバ側でも limit を適用（クライアント上限は別途 HARD_LIMIT）
+      const url = `${API_URL}?callback=onGviz&limit=${HARD_LIMIT}&v=${Date.now()}`;
+      s.src = url;
+      s.onerror = ()=> { $('status').textContent = 'データ取得に失敗しました（ネットワーク/ブロック）'; };
       document.head.appendChild(s);
     })();
 
