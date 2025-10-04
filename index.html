@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
   <meta name="theme-color" content="#ffb744">
-  <title>歌唱曲一覧（スマホ対応・2行表示・コピー可）</title>
+  <title>雲丹ゐくら歌唱曲DB</title>
 
   <style>
     /* ========= ベーススタイル（可読性重視） ========= */
@@ -39,7 +39,7 @@
 
     .row { display: flex; gap: 10px; align-items: center; }
     .row > * { flex: 1; }
-    .row-controls { margin-top: 8px; } /* 検索と上限の間に少し余白 */
+    .row-controls { margin-top: 8px; }
 
     input[type="search"], select {
       width: 100%;
@@ -54,21 +54,14 @@
     input[type="search"]:focus,
     select:focus,
     .btn:focus,
-    .chip:focus {
+    .chip:focus,
+    .link-icon:focus {
       outline: 3px solid var(--focus);
       outline-offset: 2px;
     }
 
-    /* 上限セレクトをややコンパクトに */
-    #limit {
-      padding: 6px 10px;
-      font-size: 14px;
-      line-height: 1.2;
-      max-width: 160px;
-    }
-    @supports (-webkit-touch-callout: none) {
-      #limit { padding-top: 5px; padding-bottom: 5px; }
-    }
+    #limit { padding: 6px 10px; font-size: 14px; line-height: 1.2; max-width: 160px; }
+    @supports (-webkit-touch-callout: none) { #limit { padding-top: 5px; padding-bottom: 5px; } }
 
     .muted { color: var(--muted); font-size: 13px; }
 
@@ -79,81 +72,47 @@
       color: var(--text);
       border-radius: 10px;
       padding: 8px 12px;
-      font-size: 14px;       /* 14px */
+      font-size: 14px;
       cursor: pointer;
     }
     .btn:hover { background: #f9fafb; }
     .btn:active { transform: translateY(1px); }
 
-    .toast {
-      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
-      background: rgba(17,24,39,.92); color: #fff;
-      padding: 10px 14px; border-radius: 10px; font-size: 14px;
-      opacity: 0; transition: opacity .2s ease;
-    }
+    .toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: rgba(17,24,39,.92); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s ease; }
     .toast.show { opacity: 1; }
 
     /* ========= テーブル（PC表示） ========= */
     table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-    th, td {
-      border-bottom: 1px solid var(--line);
-      padding: 10px 8px;
-      font-size: 15px;
-      vertical-align: top;
-    }
-    th {
-      position: sticky; top: 0;
-      background: var(--thead);
-      z-index: 1;
-      font-weight: 700;
-    }
-    /* 列配分：1=アーティスト 2=曲名 3=操作（Cチップ＋D小チップ（▶前回歌枠XXXXXXXX）＋コピー） */
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 8px; font-size: 15px; vertical-align: top; }
+    th { position: sticky; top: 0; background: var(--thead); z-index: 1; font-weight: 700; }
     th:nth-child(1), td:nth-child(1) { width: 30%; }
     th:nth-child(2), td:nth-child(2) { width: 50%; }
     th:nth-child(3), td:nth-child(3) { width: 20%; }
 
-    /* 操作列の中身を右寄せ・折返し対応 */
-    .ops {
-      display: flex; align-items: center; justify-content: flex-end;
-      gap: 8px; flex-wrap: wrap;
-    }
+    .ops { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 
-    /* 汎用チップ（C/D表示用） */
     .chip {
       display: inline-flex; align-items: center;
-      max-width: 100%;
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 14px;         /* 統一：14px（コピーと同等） */
-      background: var(--chip-bg);
-      color: var(--chip-text);
-      text-decoration: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      max-width: 100%; padding: 4px 8px;
+      border-radius: 999px; font-size: 14px;
+      background: var(--chip-bg); color: var(--chip-text);
+      text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       border: 1px solid var(--line);
     }
 
-    /* D列専用の小チップ（▶前回歌枠XXXXXXXX） */
-    .chip--d { padding: 2px 6px; } /* 視覚的にややコンパクト */
+    /* リンク用のアイコン（参考コードのUIを取り込み） */
+    .link-icon{ display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; line-height:1; text-decoration:none; font-size:18px; border-radius:8px; color:#111827; }
+    .link-icon:hover{ background:#f3f4f6; }
+    .link-icon:active{ transform:translateY(1px); }
 
     /* ========= スマホ：2行カード表示 ========= */
     @media (max-width: 768px) {
       table { display: none; }
       .mobile-list { display: block; margin-top: 10px; }
-      .item {
-        border-bottom: 1px solid var(--line);
-        padding: 12px 2px;
-        display: flex; flex-direction: column; gap: 6px;
-      }
-      .l1 { /* 1行目：アーティスト / 曲名（太字） */
-        font-size: 16px; line-height: 1.6; font-weight: 700;
-        display: flex; gap: 6px; flex-wrap: wrap;
-      }
+      .item { border-bottom: 1px solid var(--line); padding: 12px 2px; display: flex; flex-direction: column; gap: 6px; }
+      .l1 { font-size: 16px; line-height: 1.6; font-weight: 700; display: flex; gap: 6px; flex-wrap: wrap; }
       .l1 .sep { opacity: .6; }
-      .l2 { /* 2行目：右端に Cチップ → D小チップ（▶前回歌枠XXXXXXXX） → コピー */
-        display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
-      }
+      .l2 { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
       .btn { padding: 8px 12px; font-size: 14px; }
     }
   </style>
@@ -188,13 +147,13 @@
 
   <script>
     /* ===== 設定 ===== */
+    // Performance Record シートを直接参照（A:アーティスト, B:曲名, C:文字列, D:文字列）
     const SHEET_ID = '1Rr1pYbfVcj0ae5EhzIsK8UbEIIE0cUz-00zjruxZQK0';
-    const GID = '0';                 // 表示したいタブの gid に差し替えてください
+    const GID = '0';                  // Performance Record の gid に差し替え可能
     const MAX_FETCH_ROWS = 5000;
-    const HARD_LIMIT = 200;          // 内部上限（最大200件）
+    const HARD_LIMIT = 200;           // 内部上限（最大200件）
 
     function buildGvizUrl() {
-      // A:アーティスト B:曲名 C:テキスト D:テキスト
       const tq = encodeURIComponent(`select A,B,C,D limit ${MAX_FETCH_ROWS}`);
       return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&tqx=out:json;responseHandler:onGviz&tq=${tq}`;
     }
@@ -207,10 +166,10 @@
         const table = resp.table;
         const raw = (table.rows || []).map(r => {
           const c = r.c || [];
-          const artist   = (c[0] && c[0].v) || '';
-          const title    = (c[1] && c[1].v) || '';
-          const cText    = (c[2] && c[2].v) || ''; // C列テキスト
-          const dText    = (c[3] && c[3].v) || ''; // D列テキスト
+          const artist = (c[0] && c[0].v) || '';
+          const title  = (c[1] && c[1].v) || '';
+          const cText  = (c[2] && c[2].v) || '';
+          const dText  = (c[3] && c[3].v) || '';
           return [artist, title, cText, dText];
         });
 
@@ -232,10 +191,7 @@
     function scheduleSearch(){ clearTimeout(state.debounce); state.debounce = setTimeout(render, 220); }
     function $(id){ return document.getElementById(id); }
 
-    function showToast(msg){
-      const t = $('toast'); t.textContent = msg; t.classList.add('show');
-      setTimeout(()=> t.classList.remove('show'), 1400);
-    }
+    function showToast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 1400); }
 
     async function copyPair(title, artist){
       const text = `${(title||'').trim()} / ${(artist||'').trim()}`.trim();
@@ -247,29 +203,11 @@
           ta.select(); document.execCommand('copy'); ta.remove();
         }
         showToast('コピーしました：' + text);
-      } catch {
-        showToast('コピーに失敗しました');
-      }
+      } catch { showToast('コピーに失敗しました'); }
     }
 
-    /* === Cセルのチップ生成（プレーンテキストのみ） === */
-    function buildChipFromC(text) {
-      if (!text) return null;
-      const span = document.createElement('span');
-      span.className = 'chip';
-      span.textContent = text;
-      return span;
-    }
-
-    /* === Dセルの小チップ生成：「▶前回歌枠XXXXXXXX」（D冒頭8文字） === */
-    function buildChipFromD(dText) {
-      if (!dText) return null;
-      const head8 = String(dText).slice(0, 8);
-      const span = document.createElement('span');
-      span.className = 'chip chip--d';
-      span.textContent = `▶前回${head8}`;
-      return span;
-    }
+    // 文字列から最初のURLを抽出
+    function urlFromText(s){ if(!s) return ''; const m = String(s).match(/https?:\/\/\S+/); return m ? m[0].replace(/[)\]\s]+$/, '') : ''; }
 
     /* ===== 描画（PC=テーブル／スマホ=2行カード） ===== */
     function render(){
@@ -283,11 +221,7 @@
 
       let filtered = state.rows;
       if (q) {
-        // 常に部分一致
-        filtered = filtered.filter(([artist, title]) => {
-          const a = normalize(artist), t = normalize(title);
-          return a.includes(q) || t.includes(q);
-        });
+        filtered = filtered.filter(([artist, title]) => normalize(artist).includes(q) || normalize(title).includes(q));
       }
       const rows = filtered.slice(0, limit);
 
@@ -298,13 +232,11 @@
       if (rows.length === 0) { hint.textContent = q ? '該当なし' : '検索結果がここに表示されます。'; return; }
       hint.textContent = '';
 
-      /* ==== PC：テーブル（操作列に Cチップ → D小チップ（▶前回歌枠XXXXXXXX） → コピー） ==== */
+      /* ==== PC：テーブル（操作列に Cリンク → Dリンク（▶） → コピー） ==== */
       const table = document.createElement('table');
       const thead = document.createElement('thead');
       const trh = document.createElement('tr');
-      ['アーティスト名','曲名','操作'].forEach(h=>{
-        const th = document.createElement('th'); th.textContent = h; trh.appendChild(th);
-      });
+      ['アーティスト名','曲名','操作'].forEach(h=>{ const th = document.createElement('th'); th.textContent = h; trh.appendChild(th); });
       thead.appendChild(trh); table.appendChild(thead);
 
       const tbody = document.createElement('tbody');
@@ -317,13 +249,19 @@
         const tdOps = document.createElement('td');
         const ops = document.createElement('div'); ops.className = 'ops';
 
-        // C列チップ（プレーン）
-        const cChip = buildChipFromC(cText);
-        if (cChip) ops.appendChild(cChip);
+        // C列：文字列からURL抽出→リンクアイコン
+        const cUrl = urlFromText(cText);
+        if (cUrl) {
+          const a = document.createElement('a'); a.href = cUrl; a.target = '_blank'; a.rel='noopener'; a.className='link-icon'; a.title='C列リンクを開く'; a.textContent='C';
+          ops.appendChild(a);
+        }
 
-        // D小チップ（▶前回歌枠XXXXXXXX）— コピーの直前に配置
-        const dChip = buildChipFromD(dText);
-        if (dChip) ops.appendChild(dChip);
+        // D列：文字列からURL抽出→▶アイコン（仕様変更）
+        const dUrl = urlFromText(dText);
+        if (dUrl) {
+          const a = document.createElement('a'); a.href = dUrl; a.target = '_blank'; a.rel='noopener'; a.className='link-icon'; a.title='D列リンクを開く'; a.textContent='▶';
+          ops.appendChild(a);
+        }
 
         // コピー
         const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'コピー';
@@ -337,7 +275,7 @@
       table.appendChild(tbody);
       tableWrap.appendChild(table);
 
-      /* ==== スマホ：2行カード（右端：Cチップ → D小チップ（▶前回歌枠XXXXXXXX） → コピー） ==== */
+      /* ==== スマホ：2行カード（右端：Cリンク → Dリンク（▶） → コピー） ==== */
       rows.forEach(([artist, title, cText, dText])=>{
         const item = document.createElement('div'); item.className = 'item';
 
@@ -349,11 +287,11 @@
 
         const l2 = document.createElement('div'); l2.className = 'l2';
 
-        const cChip = buildChipFromC(cText);
-        if (cChip) l2.appendChild(cChip);
+        const cUrl = urlFromText(cText);
+        if (cUrl) { const a=document.createElement('a'); a.href=cUrl; a.target='_blank'; a.rel='noopener'; a.className='link-icon'; a.textContent='C'; a.title='C列リンクを開く'; l2.appendChild(a); }
 
-        const dChip = buildChipFromD(dText);  // コピーの左隣
-        if (dChip) l2.appendChild(dChip);
+        const dUrl = urlFromText(dText);
+        if (dUrl) { const a=document.createElement('a'); a.href=dUrl; a.target='_blank'; a.rel='noopener'; a.className='link-icon'; a.textContent='▶'; a.title='D列リンクを開く'; l2.appendChild(a); }
 
         const btn = document.createElement('button'); btn.className='btn'; btn.textContent='コピー';
         btn.addEventListener('click', ()=> copyPair(title, artist));
